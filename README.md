@@ -40,8 +40,6 @@ A fast-paced two-player word chain game playable in the browser. Built with vani
 | Hosting | [Vercel](https://vercel.com) |
 | Fonts | [Google Fonts](https://fonts.google.com) — Press Start 2P, VT323 |
 
-No frameworks. No dependencies. Single file.
-
 ---
 
 ## 🚀 Run Locally
@@ -70,13 +68,7 @@ wordduel/
 
 ## 🧠 Origin
 
-This project started as a **Java command-line mini project** for a first-year programming course, then was rebuilt as a browser game. The core game logic is the same — the web version adds a live timer, real-time dictionary validation, and a visual interface.
-
-The original Java version uses:
-- `Scanner` for keyboard input
-- `HashSet` to track used words
-- `while` loop for the game
-- Static methods for modular structure
+This project started as a **Java command-line mini project** for a first-year programming course, then was rebuilt as a browser game. The core game logic is the same. The web version adds a live timer, real-time dictionary validation, and a visual interface.
 
 ---
 
@@ -99,4 +91,4 @@ MIT License — free to use, modify, and distribute.
 
 ---
 
-<p align="center">Made with ☕ and way too much time on word games</p>
+<p align="center">⚠️ Made with Claude Sonnet 4.6</p>
