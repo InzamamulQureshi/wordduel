@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Word Duel</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --panel: #12121a;
+    --border: #2a2a3e;
+    --p1: #00f0ff;
+    --p2: #ff4fa3;
+    --accent: #ffe94a;
+    --green: #39ff14;
+    --red: #ff3a3a;
+    --text: #e8e8f0;
+    --muted: #5a5a7a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'VT323', monospace;
+    font-size: 20px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 48px;
+    background-image:
+      radial-gradient(ellipse at 20% 10%, rgba(0,240,255,0.04) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 90%, rgba(255,79,163,0.05) 0%, transparent 50%),
+      repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.015) 39px, rgba(255,255,255,0.015) 40px),
+      repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.015) 39px, rgba(255,255,255,0.015) 40px);
+  }
+
+  header { text-align:center; margin-bottom:28px; animation:fadeDown 0.6s ease both; }
+  .title {
+    font-family:'Press Start 2P',monospace;
+    font-size:clamp(16px,5vw,30px);
+    color:var(--accent);
+    text-shadow:0 0 20px rgba(255,233,74,0.5),0 0 40px rgba(255,233,74,0.2);
+    letter-spacing:2px; line-height:1.5;
+  }
+  .subtitle { font-size:18px; color:var(--muted); margin-top:6px; letter-spacing:3px; }
+
+  .screen { width:100%; max-width:680px; animation:fadeUp 0.4s ease both; }
+  .screen.hidden { display:none; }
+
+  .panel {
+    background:var(--panel); border:1px solid var(--border);
+    border-radius:4px; padding:24px; margin-bottom:14px; position:relative;
+  }
+  .panel::before {
+    content:''; position:absolute; inset:0; border-radius:4px;
+    background:linear-gradient(135deg,rgba(255,255,255,0.03) 0%,transparent 60%);
+    pointer-events:none;
+  }
+
+  /* SETUP */
+  .setup-row { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+  .player-dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; box-shadow:0 0 8px currentColor; }
+  .dot-p1 { background:var(--p1); color:var(--p1); }
+  .dot-p2 { background:var(--p2); color:var(--p2); }
+  label { font-size:18px; color:var(--muted); min-width:90px; }
+  input[type="text"] {
+    flex:1; background:#0d0d15; border:1px solid var(--border); border-radius:3px;
+    color:var(--text); font-family:'VT323',monospace; font-size:22px;
+    padding:8px 14px; outline:none; transition:border-color 0.2s;
+  }
+  input[type="text"]:focus { border-color:var(--accent); }
+  input[type="text"]::placeholder { color:var(--muted); }
+  input[type="text"]:disabled { opacity:0.5; }
+
+  .timer-setup { display:flex; align-items:center; gap:12px; margin-bottom:20px; }
+  select {
+    background:#0d0d15; border:1px solid var(--border); border-radius:3px;
+    color:var(--text); font-family:'VT323',monospace; font-size:22px;
+    padding:7px 12px; outline:none; cursor:pointer;
+  }
+  select:focus { border-color:var(--accent); }
+
+  .btn {
+    font-family:'Press Start 2P',monospace; font-size:11px;
+    padding:14px 28px; border:none; border-radius:3px;
+    cursor:pointer; letter-spacing:1px; transition:transform 0.1s,box-shadow 0.1s;
+  }
+  .btn:active { transform:scale(0.97); }
+  .btn-primary { background:var(--accent); color:#0a0a0f; width:100%; box-shadow:0 0 20px rgba(255,233,74,0.25); }
+  .btn-primary:hover { box-shadow:0 0 30px rgba(255,233,74,0.45); }
+  .btn-secondary {
+    background:transparent; border:1px solid var(--border);
+    color:var(--muted); font-family:'VT323',monospace; font-size:18px; padding:8px 20px;
+  }
+  .btn-secondary:hover { border-color:var(--accent); color:var(--accent); }
+
+  /* TIMER BAR */
+  .timer-wrap { margin-bottom:14px; }
+  .timer-top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; }
+  .timer-label { font-size:15px; color:var(--muted); letter-spacing:2px; }
+  .timer-count {
+    font-family:'Press Start 2P',monospace; font-size:20px; color:var(--green);
+    transition:color 0.3s; text-shadow:0 0 10px currentColor;
+  }
+  .timer-bar-bg { width:100%; height:8px; background:#1a1a28; border-radius:4px; overflow:hidden; }
+  .timer-bar-fill {
+    height:100%; border-radius:4px; background:var(--green);
+    transition:width 0.25s linear,background 0.3s; box-shadow:0 0 8px currentColor;
+  }
+
+  /* SCOREBOARD */
+  .scoreboard { display:grid; grid-template-columns:1fr 60px 1fr; align-items:center; gap:12px; margin-bottom:14px; }
+  .player-card { padding:14px; border-radius:3px; border:1px solid var(--border); text-align:center; transition:border-color 0.3s,background 0.3s; }
+  .player-card.active-p1 { border-color:var(--p1); background:rgba(0,240,255,0.05); }
+  .player-card.active-p2 { border-color:var(--p2); background:rgba(255,79,163,0.05); }
+  .player-name { font-size:15px; font-weight:bold; letter-spacing:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .p1-color { color:var(--p1); text-shadow:0 0 10px rgba(0,240,255,0.4); }
+  .p2-color { color:var(--p2); text-shadow:0 0 10px rgba(255,79,163,0.4); }
+  .player-score { font-size:36px; font-weight:bold; line-height:1; }
+  .vs-box { text-align:center; font-family:'Press Start 2P',monospace; font-size:10px; color:var(--muted); }
+  .round-num { font-size:28px; color:var(--accent); display:block; }
+
+  /* INFO BAR */
+  .info-bar {
+    background:#0d0d15; border:1px solid var(--border); border-radius:3px;
+    padding:12px 16px; margin-bottom:14px; min-height:50px;
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  }
+  .info-label { color:var(--muted); font-size:16px; white-space:nowrap; }
+  .last-word { font-size:26px; font-weight:bold; letter-spacing:2px; }
+  .start-letter { margin-left:auto; font-size:14px; color:var(--muted); white-space:nowrap; }
+  .start-letter span { font-size:30px; color:var(--accent); text-shadow:0 0 12px rgba(255,233,74,0.5); vertical-align:middle; margin-left:6px; }
+
+  /* INPUT PANEL */
+  .turn-indicator { font-size:16px; margin-bottom:10px; padding:6px 0; }
+  .turn-indicator .turn-name { font-size:22px; font-weight:bold; }
+  .input-row { display:flex; gap:10px; margin-bottom:12px; }
+  #wordInput { flex:1; font-size:26px; padding:10px 16px; letter-spacing:3px; }
+  .btn-submit {
+    font-family:'Press Start 2P',monospace; font-size:9px; padding:10px 14px;
+    background:var(--green); color:#0a0a0f; border:none; border-radius:3px;
+    cursor:pointer; transition:transform 0.1s,box-shadow 0.1s;
+    box-shadow:0 0 14px rgba(57,255,20,0.25); white-space:nowrap;
+  }
+  .btn-submit:hover { box-shadow:0 0 24px rgba(57,255,20,0.45); }
+  .btn-submit:active { transform:scale(0.97); }
+  .btn-submit:disabled { background:var(--muted); box-shadow:none; cursor:not-allowed; }
+
+  .feedback { font-size:18px; min-height:26px; padding:3px 0; }
+  .feedback.ok { color:var(--green); }
+  .feedback.err { color:var(--red); }
+  .feedback.checking { color:var(--accent); }
+
+  /* WORD LOG */
+  .log-title { font-size:14px; color:var(--muted); margin-bottom:8px; letter-spacing:2px; }
+  .word-log { display:flex; flex-wrap:wrap; gap:6px; max-height:90px; overflow-y:auto; padding:2px; }
+  .word-chip { font-size:16px; padding:3px 10px; border-radius:2px; border:1px solid var(--border); color:var(--muted); animation:chipPop 0.2s ease both; }
+  .word-chip.chip-p1 { border-color:rgba(0,240,255,0.3); color:var(--p1); }
+  .word-chip.chip-p2 { border-color:rgba(255,79,163,0.3); color:var(--p2); }
+
+  /* GAME OVER */
+  .winner-banner { text-align:center; padding:16px 0 8px; }
+  .trophy { font-size:50px; display:block; margin-bottom:6px; animation:bounce 0.6s ease both; }
+  .winner-label { font-family:'Press Start 2P',monospace; font-size:10px; color:var(--muted); letter-spacing:2px; }
+  .winner-name { font-size:40px; font-weight:bold; margin:6px 0; }
+  .final-scores { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:18px 0; }
+  .final-card { padding:16px; border-radius:3px; border:1px solid var(--border); text-align:center; }
+  .final-card .f-name { font-size:16px; margin-bottom:6px; }
+  .final-card .f-score { font-size:40px; font-weight:bold; }
+  .final-card.winner-card { border-color:var(--accent); background:rgba(255,233,74,0.05); }
+  .lose-reason { text-align:center; font-size:17px; color:var(--muted); margin-bottom:14px; }
+  .lose-reason span { color:var(--red); }
+  .final-btns { display:flex; gap:10px; }
+
+  /* RULES */
+  .rules { font-size:17px; line-height:2.2; color:var(--muted); }
+  .rules li { list-style:none; }
+  .rules li::before { content:'> '; color:var(--accent); }
+
+  /* ANIMATIONS */
+  @keyframes fadeDown { from{opacity:0;transform:translateY(-16px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes fadeUp   { from{opacity:0;transform:translateY(16px)}  to{opacity:1;transform:translateY(0)} }
+  @keyframes chipPop  { from{opacity:0;transform:scale(0.8)}        to{opacity:1;transform:scale(1)} }
+  @keyframes bounce   { 0%,100%{transform:translateY(0)} 40%{transform:translateY(-18px)} 70%{transform:translateY(-8px)} }
+  @keyframes shake    { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-6px)} 40%,80%{transform:translateX(6px)} }
+  @keyframes timerPulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .shake { animation:shake 0.35s ease; }
+  .pulse { animation:timerPulse 0.5s ease infinite; }
+
+  ::-webkit-scrollbar { width:4px; height:4px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title">⚔ WORD DUEL</div>
+  <div class="subtitle">A TWO PLAYER WORD CHAIN GAME</div>
+</header>
+
+<!-- ══ SETUP SCREEN ══ -->
+<div class="screen" id="setupScreen">
+  <div class="panel">
+    <div class="setup-row">
+      <div class="player-dot dot-p1"></div>
+      <label>PLAYER 1</label>
+      <input type="text" id="p1name" placeholder="Enter name..." maxlength="16" autocomplete="off">
+    </div>
+    <div class="setup-row">
+      <div class="player-dot dot-p2"></div>
+      <label>PLAYER 2</label>
+      <input type="text" id="p2name" placeholder="Enter name..." maxlength="16" autocomplete="off">
+    </div>
+    <div class="timer-setup">
+      <div class="player-dot" style="background:var(--accent);color:var(--accent);box-shadow:0 0 8px var(--accent)"></div>
+      <label>TIMER</label>
+      <select id="timerSel">
+        <option value="0">No Timer</option>
+        <option value="15" selected>15 seconds</option>
+        <option value="20">20 seconds</option>
+        <option value="30">30 seconds</option>
+        <option value="45">45 seconds</option>
+      </select>
+    </div>
+    <div id="setupErr" class="feedback err" style="margin-bottom:14px;min-height:24px;"></div>
+    <button class="btn btn-primary" onclick="startGame()">START GAME</button>
+  </div>
+  <div class="panel">
+    <div class="log-title">HOW TO PLAY</div>
+    <ul class="rules">
+      <li>Players take turns entering real English words</li>
+      <li>Each word must start with the last letter of the previous word</li>
+      <li>Wrong starting letter = instant loss</li>
+      <li>Repeating an already used word = instant loss</li>
+      <li>Not a real English word = instant loss</li>
+      <li>Timer runs out = instant loss</li>
+      <li>Leave blank and submit = give up</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ══ GAME SCREEN ══ -->
+<div class="screen hidden" id="gameScreen">
+
+  <div class="timer-wrap" id="timerWrap" style="display:none">
+    <div class="timer-top">
+      <span class="timer-label">TIME REMAINING</span>
+      <span class="timer-count" id="timerCount">15</span>
+    </div>
+    <div class="timer-bar-bg">
+      <div class="timer-bar-fill" id="timerFill" style="width:100%"></div>
+    </div>
+  </div>
+
+  <div class="scoreboard">
+    <div class="player-card" id="card0">
+      <div class="player-name p1-color" id="nameDisplay0">P1</div>
+      <div class="player-score p1-color" id="score0">0</div>
+    </div>
+    <div class="vs-box">
+      <span class="round-num" id="roundDisplay">1</span>
+      ROUND
+    </div>
+    <div class="player-card" id="card1">
+      <div class="player-name p2-color" id="nameDisplay1">P2</div>
+      <div class="player-score p2-color" id="score1">0</div>
+    </div>
+  </div>
+
+  <div class="info-bar" id="infoBar">
+    <span class="info-label">FIRST WORD</span>
+    <span class="last-word">— enter any word!</span>
+  </div>
+
+  <div class="panel">
+    <div class="turn-indicator" id="turnIndicator"></div>
+    <div class="input-row">
+      <input type="text" id="wordInput" placeholder="type a word..." maxlength="30"
+             autocomplete="off" onkeydown="if(event.key==='Enter') submitWord()">
+      <button class="btn-submit" id="submitBtn" onclick="submitWord()">SUBMIT</button>
+    </div>
+    <div class="feedback" id="feedback"></div>
+  </div>
+
+  <div class="panel">
+    <div class="log-title">WORDS PLAYED</div>
+    <div class="word-log" id="wordLog">
+      <span style="color:var(--muted);font-size:16px;">none yet...</span>
+    </div>
+  </div>
+
+  <div style="text-align:center;margin-top:6px;">
+    <button class="btn btn-secondary" onclick="if(confirm('Quit to setup?')) showSetup()">QUIT</button>
+  </div>
+</div>
+
+<!-- ══ GAME OVER SCREEN ══ -->
+<div class="screen hidden" id="overScreen">
+  <div class="panel">
+    <div class="winner-banner">
+      <span class="trophy">🏆</span>
+      <div class="winner-label">WINNER</div>
+      <div class="winner-name" id="winnerName"></div>
+    </div>
+    <div class="lose-reason" id="loseReason"></div>
+    <div class="final-scores">
+      <div class="final-card" id="finalCard0">
+        <div class="f-name p1-color" id="finalName0"></div>
+        <div class="f-score p1-color" id="finalScore0"></div>
+      </div>
+      <div class="final-card" id="finalCard1">
+        <div class="f-name p2-color" id="finalName1"></div>
+        <div class="f-score p2-color" id="finalScore1"></div>
+      </div>
+    </div>
+    <div class="final-btns">
+      <button class="btn btn-primary" style="flex:1;font-size:10px" onclick="rematch()">REMATCH</button>
+      <button class="btn btn-secondary" style="flex:1" onclick="showSetup()">CHANGE PLAYERS</button>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="log-title">ALL WORDS PLAYED</div>
+    <div class="word-log" id="overWordLog"></div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════
+// STATE
+// ══════════════════════════════════
+const S = {
+  players: ['',''],
+  scores: [0,0],
+  round: 1,
+  cur: 0,            // current player index
+  expectedStart: '', // '' means first turn, any word ok
+  lastWord: '',
+  usedWords: new Set(),
+  wordLog: [],       // [{word, player}]
+  timerDuration: 15,
+  timerLeft: 0,
+  timerInterval: null,
+  locked: false
+};
+
+// ══════════════════════════════════
+// DICTIONARY — Free Dictionary API
+// ══════════════════════════════════
+async function isRealWord(word) {
+  try {
+    const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+    return res.ok; // 200 = found, 404 = not found
+  } catch {
+    return true; // If API offline, allow (fail open)
+  }
+}
+
+// ══════════════════════════════════
+// TIMER
+// ══════════════════════════════════
+function startTimer() {
+  if (S.timerDuration === 0) return;
+  clearTimer();
+  S.timerLeft = S.timerDuration;
+  document.getElementById('timerWrap').style.display = 'block';
+  renderTimer();
+  S.timerInterval = setInterval(() => {
+    S.timerLeft--;
+    renderTimer();
+    if (S.timerLeft <= 0) {
+      clearTimer();
+      lock(true);
+      const loser = S.players[S.cur];
+      setTimeout(() => endGame(1 - S.cur, loser + ' ran out of time!'), 150);
+    }
+  }, 1000);
+}
+
+function clearTimer() {
+  clearInterval(S.timerInterval);
+  S.timerInterval = null;
+}
+
+function renderTimer() {
+  const pct = S.timerLeft / S.timerDuration;
+  const col = pct > 0.5 ? '#39ff14' : pct > 0.25 ? '#ff8c00' : '#ff3a3a';
+  const fill = document.getElementById('timerFill');
+  const cnt  = document.getElementById('timerCount');
+  fill.style.width = (pct * 100) + '%';
+  fill.style.background = col;
+  fill.style.boxShadow = `0 0 8px ${col}`;
+  cnt.style.color = col;
+  cnt.textContent = S.timerLeft;
+  cnt.classList.toggle('pulse', S.timerLeft <= 5);
+}
+
+// ══════════════════════════════════
+// SETUP
+// ══════════════════════════════════
+function startGame() {
+  const p1 = document.getElementById('p1name').value.trim();
+  const p2 = document.getElementById('p2name').value.trim();
+  const err = document.getElementById('setupErr');
+  if (!p1 || !p2) { err.textContent = '> Both players need a name!'; return; }
+  if (p1.toLowerCase() === p2.toLowerCase()) { err.textContent = '> Players must have different names!'; return; }
+  err.textContent = '';
+
+  Object.assign(S, {
+    players: [p1, p2], scores: [0,0], round: 1, cur: 0,
+    expectedStart: '', lastWord: '', usedWords: new Set(),
+    wordLog: [], timerDuration: parseInt(document.getElementById('timerSel').value),
+    locked: false
+  });
+
+  document.getElementById('wordLog').innerHTML = '<span style="color:var(--muted);font-size:16px;">none yet...</span>';
+  document.getElementById('feedback').textContent = '';
+  document.getElementById('wordInput').value = '';
+  if (S.timerDuration === 0) document.getElementById('timerWrap').style.display = 'none';
+
+  renderGame();
+  show('gameScreen');
+  lock(false);
+  startTimer();
+  document.getElementById('wordInput').focus();
+}
+
+// ══════════════════════════════════
+// SUBMIT
+// ══════════════════════════════════
+async function submitWord() {
+  if (S.locked) return;
+  const raw = document.getElementById('wordInput').value;
+  const word = raw.trim().toLowerCase();
+  const fb = document.getElementById('feedback');
+
+  // Empty = give up
+  if (word === '') {
+    clearTimer();
+    endGame(1 - S.cur, S.players[S.cur] + ' gave up!');
+    return;
+  }
+
+  // Letters only (soft error — just shows message, doesn't end game)
+  if (!/^[a-z]+$/.test(word)) {
+    showErr('Letters only! No numbers or symbols.');
+    return;
+  }
+
+  // Wrong starting letter → LOSS
+  if (S.expectedStart && word[0] !== S.expectedStart) {
+    clearTimer();
+    endGame(1 - S.cur,
+      `"${word.toUpperCase()}" doesn't start with "${S.expectedStart.toUpperCase()}" — ${S.players[S.cur]} loses!`);
+    return;
+  }
+
+  // Repeated word → LOSS
+  if (S.usedWords.has(word)) {
+    clearTimer();
+    endGame(1 - S.cur,
+      `"${word.toUpperCase()}" was already used — ${S.players[S.cur]} loses!`);
+    return;
+  }
+
+  // Dictionary check (async)
+  lock(true);
+  fb.textContent = '> Checking dictionary...';
+  fb.className = 'feedback checking';
+
+  const real = await isRealWord(word);
+
+  if (!real) {
+    lock(false);
+    // Not a real word → LOSS
+    clearTimer();
+    endGame(1 - S.cur,
+      `"${word.toUpperCase()}" is not a real word — ${S.players[S.cur]} loses!`);
+    return;
+  }
+
+  // ✅ All good — accept the word
+  clearTimer();
+  S.usedWords.add(word);
+  S.wordLog.push({ word, player: S.cur });
+  S.scores[S.cur]++;
+  S.lastWord = word;
+  S.expectedStart = word[word.length - 1];
+  S.round++;
+  S.cur = 1 - S.cur;
+
+  document.getElementById('wordInput').value = '';
+  fb.textContent = `> "${word}" accepted!`;
+  fb.className = 'feedback ok';
+  addChip(S.wordLog[S.wordLog.length - 1]);
+  renderGame();
+  lock(false);
+  startTimer();
+  document.getElementById('wordInput').focus();
+  setTimeout(() => { if (fb.className.includes('ok')) fb.textContent = ''; }, 1500);
+}
+
+// ══════════════════════════════════
+// RENDER
+// ══════════════════════════════════
+function renderGame() {
+  document.getElementById('score0').textContent = S.scores[0];
+  document.getElementById('score1').textContent = S.scores[1];
+  document.getElementById('roundDisplay').textContent = S.round;
+  document.getElementById('nameDisplay0').textContent = S.players[0];
+  document.getElementById('nameDisplay1').textContent = S.players[1];
+  document.getElementById('card0').className = 'player-card' + (S.cur === 0 ? ' active-p1' : '');
+  document.getElementById('card1').className = 'player-card' + (S.cur === 1 ? ' active-p2' : '');
+
+  const infoBar = document.getElementById('infoBar');
+  if (S.lastWord) {
+    infoBar.innerHTML = `
+      <span class="info-label">LAST WORD</span>
+      <span class="last-word">${S.lastWord.toUpperCase()}</span>
+      <span class="start-letter">NEXT STARTS WITH<span>${S.expectedStart.toUpperCase()}</span></span>`;
+  } else {
+    infoBar.innerHTML = `<span class="info-label">FIRST WORD</span><span class="last-word">— enter any word!</span>`;
+  }
+
+  const col = S.cur === 0 ? 'var(--p1)' : 'var(--p2)';
+  document.getElementById('turnIndicator').innerHTML =
+    `<span style="color:var(--muted);font-size:16px;">YOUR TURN — </span>
+     <span class="turn-name" style="color:${col}">${S.players[S.cur].toUpperCase()}</span>`;
+}
+
+function addChip(entry) {
+  const log = document.getElementById('wordLog');
+  if (log.querySelector('span')) log.innerHTML = '';
+  const chip = document.createElement('div');
+  chip.className = 'word-chip chip-p' + (entry.player + 1);
+  chip.textContent = entry.word;
+  log.appendChild(chip);
+  log.scrollTop = log.scrollHeight;
+}
+
+// ══════════════════════════════════
+// END GAME
+// ══════════════════════════════════
+function endGame(winnerIdx, reason) {
+  clearTimer();
+  document.getElementById('winnerName').textContent = S.players[winnerIdx].toUpperCase();
+  document.getElementById('winnerName').style.color = winnerIdx === 0 ? 'var(--p1)' : 'var(--p2)';
+  document.getElementById('loseReason').innerHTML = '> <span>' + reason + '</span>';
+
+  for (let i = 0; i < 2; i++) {
+    document.getElementById('finalName' + i).textContent = S.players[i];
+    document.getElementById('finalScore' + i).textContent = S.scores[i];
+    document.getElementById('finalCard' + i).className =
+      'final-card' + (i === winnerIdx ? ' winner-card' : '');
+  }
+
+  const overLog = document.getElementById('overWordLog');
+  overLog.innerHTML = '';
+  if (S.wordLog.length === 0) {
+    overLog.innerHTML = '<span style="color:var(--muted)">No words were played.</span>';
+  } else {
+    S.wordLog.forEach(e => {
+      const chip = document.createElement('div');
+      chip.className = 'word-chip chip-p' + (e.player + 1);
+      chip.textContent = e.word;
+      overLog.appendChild(chip);
+    });
+  }
+  show('overScreen');
+}
+
+function rematch() {
+  clearTimer();
+  Object.assign(S, {
+    scores:[0,0], round:1, cur:0, expectedStart:'',
+    lastWord:'', usedWords:new Set(), wordLog:[], locked:false
+  });
+  document.getElementById('wordLog').innerHTML = '<span style="color:var(--muted);font-size:16px;">none yet...</span>';
+  document.getElementById('feedback').textContent = '';
+  document.getElementById('wordInput').value = '';
+  renderGame();
+  show('gameScreen');
+  lock(false);
+  startTimer();
+  document.getElementById('wordInput').focus();
+}
+
+function showSetup() {
+  clearTimer();
+  show('setupScreen');
+  document.getElementById('p1name').focus();
+}
+
+function show(id) {
+  ['setupScreen','gameScreen','overScreen'].forEach(s =>
+    document.getElementById(s).classList.toggle('hidden', s !== id));
+}
+
+function lock(on) {
+  S.locked = on;
+  document.getElementById('wordInput').disabled = on;
+  document.getElementById('submitBtn').disabled = on;
+}
+
+function showErr(msg) {
+  const fb = document.getElementById('feedback');
+  const inp = document.getElementById('wordInput');
+  fb.textContent = '> ' + msg;
+  fb.className = 'feedback err';
+  inp.classList.remove('shake');
+  void inp.offsetWidth;
+  inp.classList.add('shake');
+  setTimeout(() => inp.classList.remove('shake'), 400);
+  inp.focus();
+}
+</script>
+</body>
+</html>
