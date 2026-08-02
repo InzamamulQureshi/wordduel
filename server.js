@@ -8,88 +8,96 @@ app.use(cors());
 app.get('/', (_, res) => res.send('WordDuel server running'));
 
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'] }
-});
+const io = new Server(server, { cors: { origin: '*', methods: ['GET', 'POST'] } });
 
-// ─────────────────────────────────────────
-// ROOMS  { [code]: Room }
-// ─────────────────────────────────────────
 const rooms = {};
 
 function makeCode() {
   return Math.random().toString(36).slice(2, 7).toUpperCase();
 }
 
-// ─────────────────────────────────────────
-// SCORING
-// rare English words list (5-letter+ uncommon)
-// We use two signals:
-//   length  — 1 pt per letter above 3
-//   rarity  — bonus if word length >= 7 (+3), >=5 (+1)
-// Total max ~15 pts per word
-// ─────────────────────────────────────────
+// ── SCORING ──
 function scoreWord(word) {
   const len = word.length;
-  let pts = Math.max(0, len - 3);          // 0 for <=3 letters, 1 per extra letter
-  if (len >= 7) pts += 3;                  // rarity bonus for long words
+  let pts = Math.max(0, len - 3);
+  if (len >= 7) pts += 3;
   else if (len >= 5) pts += 1;
-  return Math.max(1, pts);                 // minimum 1 point
+  return Math.max(1, pts);
 }
 
-// ─────────────────────────────────────────
-// DICTIONARY CHECK (free API call from server)
-// ─────────────────────────────────────────
+// ── DICTIONARY — Datamuse API (much more permissive than dictionaryapi.dev) ──
 async function isRealWord(word) {
   try {
-    const res = await fetch(
-      `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`
-    );
-    return res.ok;
+    // Datamuse returns words that match — if the exact word is in results it's valid
+    const res = await fetch(`https://api.datamuse.com/words?sp=${encodeURIComponent(word)}&max=1`);
+    if (!res.ok) return true; // fail open
+    const data = await res.json();
+    // Check the first result is an exact match
+    return Array.isArray(data) && data.length > 0 && data[0].word === word;
   } catch {
     return true; // fail open if API down
   }
 }
 
-// ─────────────────────────────────────────
-// TIMER helpers
-// ─────────────────────────────────────────
+// ── TURN TIMER ──
 function clearRoomTimer(room) {
-  if (room.timerRef) {
-    clearTimeout(room.timerRef);
-    room.timerRef = null;
-  }
+  if (room.timerRef) { clearTimeout(room.timerRef); room.timerRef = null; }
 }
 
 function startTurnTimer(room) {
   clearRoomTimer(room);
-  if (!room.timerSeconds) return;
-  room.turnStartedAt = Date.now();
+  if (!room.turnSeconds) return;
   room.timerRef = setTimeout(() => {
-    handleMistake(room, room.currentPlayer, 'timeout');
-  }, room.timerSeconds * 1000);
+    handleMistake(room, room.currentPlayer, 'ran out of time');
+  }, room.turnSeconds * 1000);
 }
 
-// ─────────────────────────────────────────
-// MISTAKE handler (elimination or penalty)
-// ─────────────────────────────────────────
+// ── GAME CLOCK (total game duration) ──
+function startGameClock(room) {
+  if (!room.gameDuration) return; // 0 = no limit
+  room.gameEndsAt = Date.now() + room.gameDuration * 1000;
+  room.gameClockRef = setTimeout(() => {
+    endGameByTime(room);
+  }, room.gameDuration * 1000);
+}
+
+function clearGameClock(room) {
+  if (room.gameClockRef) { clearTimeout(room.gameClockRef); room.gameClockRef = null; }
+}
+
+function endGameByTime(room) {
+  if (room.phase !== 'playing') return;
+  clearRoomTimer(room);
+  clearGameClock(room);
+  room.phase = 'over';
+  const scores = room.players.map(p => ({ name: p.name, score: p.score }));
+  const sorted = [...room.players].sort((a, b) => b.score - a.score);
+  const winner = sorted[0].score === sorted[1].score ? null : sorted[0];
+  io.to(room.code).emit('gameOver', {
+    reason: "Time's up!",
+    winner: winner ? winner.name : null,
+    draw: !winner,
+    scores,
+  });
+}
+
+// ── MISTAKE HANDLER ──
 function handleMistake(room, loserSocketId, reason) {
   clearRoomTimer(room);
   const loser = room.players.find(p => p.id === loserSocketId);
   if (!loser || room.phase !== 'playing') return;
 
   if (room.mode === 'elimination') {
-    // Game over — other player wins
+    clearGameClock(room);
     room.phase = 'over';
     const winner = room.players.find(p => p.id !== loserSocketId);
     io.to(room.code).emit('gameOver', {
-      reason,
-      loser: loser.name,
+      reason: `${loser.name} ${reason}`,
       winner: winner ? winner.name : '?',
+      draw: false,
       scores: room.players.map(p => ({ name: p.name, score: p.score }))
     });
   } else {
-    // Penalty mode — deduct 3 pts, switch turn, keep playing
     loser.score = Math.max(0, loser.score - 3);
     room.currentPlayer = room.players.find(p => p.id !== loserSocketId)?.id;
     io.to(room.code).emit('penalty', {
@@ -99,40 +107,42 @@ function handleMistake(room, loserSocketId, reason) {
       currentPlayer: room.currentPlayer,
       lastWord: room.lastWord,
       expectedStart: room.expectedStart,
+      gameEndsAt: room.gameEndsAt || null,
     });
     startTurnTimer(room);
   }
 }
 
-// ─────────────────────────────────────────
-// SOCKET EVENTS
-// ─────────────────────────────────────────
+// ── SOCKET EVENTS ──
 io.on('connection', socket => {
   console.log('connect', socket.id);
 
-  // ── CREATE ROOM ──
-  socket.on('createRoom', ({ name, timerSeconds, mode }) => {
+  // CREATE ROOM
+  socket.on('createRoom', ({ name, turnSeconds, gameDuration, mode }) => {
     const code = makeCode();
     rooms[code] = {
       code,
-      phase: 'waiting',       // waiting | playing | over
-      mode: mode || 'elimination', // elimination | penalty
-      timerSeconds: timerSeconds || 15,
+      phase: 'waiting',
+      mode: mode || 'elimination',
+      turnSeconds: turnSeconds || 15,
+      gameDuration: gameDuration || 0, // seconds, 0 = no limit
       players: [{ id: socket.id, name, score: 0 }],
       usedWords: new Set(),
       lastWord: null,
       expectedStart: null,
       currentPlayer: null,
       timerRef: null,
-      turnStartedAt: null,
+      gameClockRef: null,
+      gameEndsAt: null,
+      endVotes: new Set(), // tracks who voted to end
     };
     socket.join(code);
     socket.data.roomCode = code;
-    socket.emit('roomCreated', { code, mode, timerSeconds: rooms[code].timerSeconds });
+    socket.emit('roomCreated', { code, mode, turnSeconds: rooms[code].turnSeconds, gameDuration: rooms[code].gameDuration });
     console.log(`Room ${code} created by ${name}`);
   });
 
-  // ── JOIN ROOM ──
+  // JOIN ROOM
   socket.on('joinRoom', ({ name, code }) => {
     const room = rooms[code.toUpperCase()];
     if (!room) { socket.emit('error', 'Room not found.'); return; }
@@ -141,63 +151,43 @@ io.on('connection', socket => {
     if (room.players[0].name.toLowerCase() === name.toLowerCase()) {
       socket.emit('error', 'That name is taken in this room.'); return;
     }
-
     room.players.push({ id: socket.id, name, score: 0 });
     socket.join(code.toUpperCase());
     socket.data.roomCode = code.toUpperCase();
-
-    // Both players in — start the game
     room.phase = 'playing';
-    room.currentPlayer = room.players[0].id; // creator goes first
-
+    room.currentPlayer = room.players[0].id;
+    startGameClock(room);
     io.to(room.code).emit('gameStart', {
       players: room.players.map(p => ({ name: p.name, score: p.score, id: p.id })),
       currentPlayer: room.currentPlayer,
       mode: room.mode,
-      timerSeconds: room.timerSeconds,
+      turnSeconds: room.turnSeconds,
+      gameDuration: room.gameDuration,
+      gameEndsAt: room.gameEndsAt,
     });
-
     startTurnTimer(room);
     console.log(`Room ${code} started`);
   });
 
-  // ── SUBMIT WORD ──
+  // SUBMIT WORD
   socket.on('submitWord', async ({ word: rawWord }) => {
     const code = socket.data.roomCode;
     const room = rooms[code];
     if (!room || room.phase !== 'playing') return;
-    if (room.currentPlayer !== socket.id) {
-      socket.emit('error', 'Not your turn.'); return;
-    }
-
+    if (room.currentPlayer !== socket.id) { socket.emit('error', 'Not your turn.'); return; }
     const word = rawWord.trim().toLowerCase();
-
-    // letters only
-    if (!/^[a-z]+$/.test(word)) {
-      socket.emit('wordError', 'Letters only!'); return;
-    }
-
-    // wrong starting letter → mistake
+    if (!/^[a-z]+$/.test(word)) { socket.emit('wordError', 'Letters only!'); return; }
     if (room.expectedStart && word[0] !== room.expectedStart) {
-      handleMistake(room, socket.id, `"${word}" doesn't start with "${room.expectedStart.toUpperCase()}"`);
-      return;
+      handleMistake(room, socket.id, `used "${word}" — wrong starting letter`); return;
     }
-
-    // repeated word → mistake
     if (room.usedWords.has(word)) {
-      handleMistake(room, socket.id, `"${word}" was already used`);
-      return;
+      handleMistake(room, socket.id, `repeated "${word}"`); return;
     }
-
-    // dictionary check
-    socket.emit('checking'); // tell client to show spinner
+    socket.emit('checking');
     const valid = await isRealWord(word);
     if (!valid) {
-      handleMistake(room, socket.id, `"${word}" is not a real word`);
-      return;
+      handleMistake(room, socket.id, `"${word}" is not a valid word`); return;
     }
-
-    // ✅ valid — accept
     clearRoomTimer(room);
     const pts = scoreWord(word);
     const player = room.players.find(p => p.id === socket.id);
@@ -206,40 +196,73 @@ io.on('connection', socket => {
     room.lastWord = word;
     room.expectedStart = word[word.length - 1];
     room.currentPlayer = room.players.find(p => p.id !== socket.id)?.id;
-
     io.to(room.code).emit('wordAccepted', {
-      word,
-      pts,
+      word, pts,
       playedBy: player.name,
       scores: room.players.map(p => ({ name: p.name, score: p.score })),
       currentPlayer: room.currentPlayer,
       expectedStart: room.expectedStart,
+      gameEndsAt: room.gameEndsAt || null,
     });
-
     startTurnTimer(room);
   });
 
-  // ── GIVE UP ──
+  // GIVE UP
   socket.on('giveUp', () => {
     const room = rooms[socket.data.roomCode];
     if (!room || room.phase !== 'playing') return;
-    handleMistake(room, socket.id, `${room.players.find(p=>p.id===socket.id)?.name} gave up`);
+    const name = room.players.find(p => p.id === socket.id)?.name;
+    handleMistake(room, socket.id, `${name} gave up`);
   });
 
-  // ── DISCONNECT ──
+  // REQUEST END GAME (mutual agreement)
+  socket.on('requestEndGame', () => {
+    const room = rooms[socket.data.roomCode];
+    if (!room || room.phase !== 'playing') return;
+    const requester = room.players.find(p => p.id === socket.id);
+    if (!requester) return;
+    room.endVotes.add(socket.id);
+    // Tell the OTHER player someone wants to end
+    const other = room.players.find(p => p.id !== socket.id);
+    if (other) {
+      io.to(other.id).emit('endGameRequest', { from: requester.name });
+    }
+  });
+
+  // ACCEPT END GAME
+  socket.on('acceptEndGame', () => {
+    const room = rooms[socket.data.roomCode];
+    if (!room || room.phase !== 'playing') return;
+    room.endVotes.add(socket.id);
+    if (room.endVotes.size >= 2) {
+      endGameByTime(room); // reuse the "end by score" logic
+    }
+  });
+
+  // DECLINE END GAME
+  socket.on('declineEndGame', () => {
+    const room = rooms[socket.data.roomCode];
+    if (!room) return;
+    room.endVotes.clear();
+    const decliner = room.players.find(p => p.id === socket.id);
+    io.to(room.code).emit('endGameDeclined', { by: decliner?.name });
+  });
+
+  // DISCONNECT
   socket.on('disconnect', () => {
     const code = socket.data.roomCode;
     const room = rooms[code];
     if (!room) return;
     clearRoomTimer(room);
+    clearGameClock(room);
     if (room.phase === 'playing') {
       const other = room.players.find(p => p.id !== socket.id);
       room.phase = 'over';
       if (other) {
         io.to(code).emit('gameOver', {
-          reason: 'opponent disconnected',
+          reason: 'Opponent disconnected',
           winner: other.name,
-          loser: room.players.find(p => p.id === socket.id)?.name || '?',
+          draw: false,
           scores: room.players.map(p => ({ name: p.name, score: p.score }))
         });
       }
