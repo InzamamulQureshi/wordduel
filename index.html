@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Word Duel</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+:root{
+  --bg:#0a0a0f;--panel:#12121a;--border:#2a2a3e;
+  --p1:#00f0ff;--p2:#ff4fa3;--accent:#ffe94a;
+  --green:#39ff14;--red:#ff3a3a;--text:#e8e8f0;--muted:#5a5a7a;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--text);font-family:'VT323',monospace;font-size:20px;
+  min-height:100vh;display:flex;flex-direction:column;align-items:center;
+  padding:20px 14px 48px;
+  background-image:
+    radial-gradient(ellipse at 20% 10%,rgba(0,240,255,.04) 0%,transparent 50%),
+    radial-gradient(ellipse at 80% 90%,rgba(255,79,163,.05) 0%,transparent 50%),
+    repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(255,255,255,.015) 39px,rgba(255,255,255,.015) 40px),
+    repeating-linear-gradient(90deg,transparent,transparent 39px,rgba(255,255,255,.015) 39px,rgba(255,255,255,.015) 40px);
+}
+header{text-align:center;margin-bottom:24px;animation:fadeDown .6s ease both}
+.title{font-family:'Press Start 2P',monospace;font-size:clamp(14px,5vw,28px);color:var(--accent);text-shadow:0 0 20px rgba(255,233,74,.5);letter-spacing:2px;line-height:1.5}
+.subtitle{font-size:16px;color:var(--muted);margin-top:6px;letter-spacing:3px}
+.screen{width:100%;max-width:520px;animation:fadeUp .4s ease both}
+.screen.hidden{display:none}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:20px;margin-bottom:12px;position:relative}
+.panel::before{content:'';position:absolute;inset:0;border-radius:4px;background:linear-gradient(135deg,rgba(255,255,255,.03) 0%,transparent 60%);pointer-events:none}
+.panel-title{font-family:'Press Start 2P',monospace;font-size:10px;color:var(--accent);margin-bottom:16px;letter-spacing:1px}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.field label{font-size:15px;color:var(--muted);letter-spacing:1px}
+input[type=text],select{width:100%;background:#0d0d15;border:1px solid var(--border);border-radius:3px;color:var(--text);font-family:'VT323',monospace;font-size:22px;padding:9px 14px;outline:none;transition:border-color .2s}
+input[type=text]:focus,select:focus{border-color:var(--accent)}
+input[type=text]::placeholder{color:var(--muted)}
+input[type=text]:disabled{opacity:.5}
+select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%235a5a7a' d='M6 8L0 0h12z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+.btn{font-family:'Press Start 2P',monospace;font-size:10px;padding:14px 20px;border:none;border-radius:3px;cursor:pointer;letter-spacing:1px;transition:transform .1s,box-shadow .1s;-webkit-tap-highlight-color:transparent;display:block;width:100%}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--accent);color:#0a0a0f;box-shadow:0 0 20px rgba(255,233,74,.25)}
+.btn-primary:hover{box-shadow:0 0 30px rgba(255,233,74,.45)}
+.btn-secondary{background:transparent;border:1px solid var(--border);width:auto;display:inline-block;color:var(--muted);font-family:'VT323',monospace;font-size:18px;padding:8px 18px}
+.btn-secondary:hover{border-color:var(--accent);color:var(--accent)}
+.btn-danger{background:#2a0a0a;border:1px solid var(--red);color:var(--red);font-family:'VT323',monospace;font-size:18px;padding:8px 18px;width:auto;display:inline-block;cursor:pointer;border-radius:3px;-webkit-tap-highlight-color:transparent}
+.btn-danger:hover{background:#3a0f0f}
+.divider{display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--muted);font-size:15px}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+.msg{font-size:17px;min-height:24px;padding:3px 0;word-break:break-word;margin-top:6px}
+.msg.err{color:var(--red)}.msg.ok{color:var(--green)}.msg.info{color:var(--accent)}
+
+/* CUSTOM TIME INPUT */
+.custom-time{display:none;margin-top:8px}
+.custom-time input{font-size:22px;padding:9px 14px}
+
+/* WAITING */
+.room-code-display{font-family:'Press Start 2P',monospace;font-size:clamp(24px,8vw,40px);color:var(--accent);text-align:center;letter-spacing:6px;text-shadow:0 0 20px rgba(255,233,74,.4);padding:16px 0}
+.waiting-status{text-align:center;font-size:18px;color:var(--muted);margin-bottom:14px}
+.dots::after{content:'';animation:dots 1.2s steps(4,end) infinite}
+@keyframes dots{0%{content:''}25%{content:'.'}50%{content:'..'}75%{content:'...'}}
+
+/* GAME CLOCK (total time) */
+.game-clock-bar{margin-bottom:10px;display:none}
+.game-clock-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+.game-clock-label{font-size:12px;color:var(--muted);letter-spacing:2px}
+.game-clock-count{font-family:'Press Start 2P',monospace;font-size:14px;color:var(--accent)}
+.game-clock-bg{width:100%;height:5px;background:#1a1a28;border-radius:3px;overflow:hidden}
+.game-clock-fill{height:100%;background:var(--accent);border-radius:3px;transition:width 1s linear;box-shadow:0 0 6px var(--accent)}
+
+/* TURN TIMER */
+.timer-wrap{margin-bottom:10px}
+.timer-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
+.timer-label{font-size:13px;color:var(--muted);letter-spacing:2px}
+.timer-count{font-family:'Press Start 2P',monospace;font-size:18px;color:var(--green);transition:color .3s;text-shadow:0 0 10px currentColor}
+.timer-bar-bg{width:100%;height:8px;background:#1a1a28;border-radius:4px;overflow:hidden}
+.timer-bar-fill{height:100%;border-radius:4px;background:var(--green);transition:width .25s linear,background .3s;box-shadow:0 0 8px currentColor}
+
+/* SCOREBOARD */
+.scoreboard{display:grid;grid-template-columns:1fr 44px 1fr;align-items:center;gap:8px;margin-bottom:12px}
+.player-card{padding:10px 8px;border-radius:3px;border:1px solid var(--border);text-align:center;transition:border-color .3s,background .3s;min-width:0;overflow:hidden}
+.player-card.active-p1{border-color:var(--p1);background:rgba(0,240,255,.05)}
+.player-card.active-p2{border-color:var(--p2);background:rgba(255,79,163,.05)}
+.player-card.me-tag .pname::after{content:' ★';font-size:9px;opacity:.6}
+.pname{font-size:clamp(10px,3vw,14px);font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pscore{font-size:clamp(22px,7vw,34px);font-weight:bold;line-height:1.1}
+.p1c{color:var(--p1);text-shadow:0 0 10px rgba(0,240,255,.4)}
+.p2c{color:var(--p2);text-shadow:0 0 10px rgba(255,79,163,.4)}
+.vs-box{text-align:center;font-family:'Press Start 2P',monospace;font-size:8px;color:var(--muted)}
+.round-num{font-size:clamp(16px,5vw,24px);color:var(--accent);display:block}
+
+/* INFO BAR */
+.info-bar{background:#0d0d15;border:1px solid var(--border);border-radius:3px;padding:10px 14px;margin-bottom:12px;display:flex;flex-direction:column;gap:4px}
+.info-label{color:var(--muted);font-size:14px}
+.last-word{font-size:clamp(18px,6vw,26px);font-weight:bold;letter-spacing:2px;word-break:break-all}
+.start-letter{font-size:14px;color:var(--muted)}
+.start-letter span{font-size:clamp(20px,6vw,28px);color:var(--accent);text-shadow:0 0 12px rgba(255,233,74,.5);vertical-align:middle;margin-left:4px}
+
+/* INPUT */
+.turn-indicator{font-size:15px;margin-bottom:8px;padding:4px 0}
+.turn-name{font-size:clamp(16px,5vw,20px);font-weight:bold}
+.your-turn-banner{background:rgba(255,233,74,.07);border:1px solid rgba(255,233,74,.3);border-radius:3px;padding:8px 12px;font-size:16px;color:var(--accent);text-align:center;margin-bottom:10px;display:none}
+.input-row{display:flex;gap:8px;margin-bottom:8px}
+#wordInput{flex:1;min-width:0;font-size:clamp(18px,5vw,24px);padding:10px 12px;letter-spacing:2px}
+.btn-submit{font-family:'Press Start 2P',monospace;font-size:8px;padding:10px 12px;background:var(--green);color:#0a0a0f;border:none;border-radius:3px;cursor:pointer;transition:transform .1s,box-shadow .1s;box-shadow:0 0 14px rgba(57,255,20,.25);white-space:nowrap;flex-shrink:0;-webkit-tap-highlight-color:transparent}
+.btn-submit:hover{box-shadow:0 0 24px rgba(57,255,20,.45)}
+.btn-submit:active{transform:scale(.97)}
+.btn-submit:disabled{background:var(--muted);box-shadow:none;cursor:not-allowed}
+.feedback{font-size:16px;min-height:22px;padding:2px 0;word-break:break-word}
+.feedback.ok{color:var(--green)}.feedback.err{color:var(--red)}.feedback.info{color:var(--accent)}
+
+/* BOTTOM BUTTONS */
+.game-actions{display:flex;gap:8px;margin-top:6px;justify-content:center}
+
+/* WORD LOG */
+.log-title{font-size:12px;color:var(--muted);margin-bottom:8px;letter-spacing:2px}
+.word-log{display:flex;flex-wrap:wrap;gap:5px;max-height:80px;overflow-y:auto;padding:2px}
+.chip{font-size:14px;padding:2px 8px;border-radius:2px;border:1px solid var(--border);animation:chipPop .2s ease both}
+.chip.c1{border-color:rgba(0,240,255,.3);color:var(--p1)}
+.chip.c2{border-color:rgba(255,79,163,.3);color:var(--p2)}
+.chip .pts{font-size:11px;opacity:.7;margin-left:3px}
+
+/* MODE / PENALTY BADGES */
+.mode-badge{display:inline-block;font-size:12px;padding:3px 10px;border-radius:2px;border:1px solid var(--border);color:var(--muted);letter-spacing:1px;margin-bottom:14px}
+.mode-badge.elim{border-color:rgba(255,58,58,.4);color:var(--red)}
+.mode-badge.pen{border-color:rgba(255,233,74,.3);color:var(--accent)}
+.penalty-flash{background:#2a0a0a;border:1px solid var(--red);border-radius:3px;padding:8px 12px;font-size:16px;color:var(--red);text-align:center;margin-bottom:10px;display:none;animation:fadeIn .3s ease}
+
+/* END GAME MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:100;display:none}
+.modal-overlay.visible{display:flex}
+.modal{background:var(--panel);border:1px solid var(--accent);border-radius:6px;padding:24px;max-width:320px;width:90%;text-align:center}
+.modal h2{font-family:'Press Start 2P',monospace;font-size:11px;color:var(--accent);margin-bottom:12px;line-height:1.6}
+.modal p{font-size:18px;color:var(--muted);margin-bottom:20px;line-height:1.5}
+.modal-btns{display:flex;gap:10px}
+.modal-btns .btn{flex:1;font-size:9px;padding:12px}
+
+/* GAME OVER */
+.trophy{font-size:46px;display:block;text-align:center;margin-bottom:6px;animation:bounce .6s ease both}
+.winner-label{font-family:'Press Start 2P',monospace;font-size:9px;color:var(--muted);letter-spacing:2px;text-align:center}
+.winner-name{font-size:clamp(22px,8vw,38px);font-weight:bold;margin:6px 0;word-break:break-word;text-align:center}
+.final-scores{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+.fcard{padding:12px 8px;border-radius:3px;border:1px solid var(--border);text-align:center}
+.fcard.winner{border-color:var(--accent);background:rgba(255,233,74,.05)}
+.fcard .fname{font-size:14px;margin-bottom:4px;word-break:break-word}
+.fcard .fscore{font-size:clamp(26px,8vw,36px);font-weight:bold}
+.over-reason{text-align:center;font-size:16px;color:var(--muted);margin-bottom:12px;word-break:break-word;line-height:1.5}
+.over-reason span{color:var(--red)}
+
+/* HOW TO PLAY */
+.rules{font-size:16px;line-height:2.1;color:var(--muted)}
+.rules li{list-style:none}
+.rules li::before{content:'> ';color:var(--accent)}
+.rules .pts-note{font-size:14px;color:var(--muted);margin-top:8px;line-height:1.8}
+.rules .pts-note span{color:var(--accent)}
+
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes fadeDown{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes chipPop{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)}}
+@keyframes bounce{0%,100%{transform:translateY(0)}40%{transform:translateY(-18px)}70%{transform:translateY(-8px)}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.shake{animation:shake .35s ease}
+.pulse-anim{animation:pulse .5s ease infinite}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+@media(max-width:380px){
+  body{padding:14px 10px 36px}
+  .panel{padding:14px 12px}
+  .btn{font-size:9px;padding:12px 14px}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="title">⚔ WORD DUEL</div>
+  <div class="subtitle">MULTIPLAYER</div>
+</header>
+
+<!-- END GAME CONFIRMATION MODAL -->
+<div class="modal-overlay" id="endModal">
+  <div class="modal">
+    <h2>END GAME?</h2>
+    <p id="endModalMsg">Your opponent wants to end the game early. Winner is decided by score.</p>
+    <div class="modal-btns">
+      <button class="btn btn-primary" onclick="acceptEnd()">ACCEPT</button>
+      <button class="btn btn-danger" style="width:auto;display:block;flex:1;font-family:'Press Start 2P',monospace;font-size:9px;padding:12px" onclick="declineEnd()">DECLINE</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ LOBBY ══ -->
+<div class="screen" id="lobbyScreen">
+  <div class="panel">
+    <div class="panel-title">CREATE ROOM</div>
+    <div class="field">
+      <label>YOUR NAME</label>
+      <input type="text" id="createName" placeholder="Enter name..." maxlength="16" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>TURN TIMER</label>
+      <select id="createTimer">
+        <option value="10">10 seconds</option>
+        <option value="15" selected>15 seconds</option>
+        <option value="20">20 seconds</option>
+        <option value="30">30 seconds</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>GAME DURATION</label>
+      <select id="gameDuration" onchange="onDurationChange()">
+        <option value="0">No Limit</option>
+        <option value="120">2 minutes</option>
+        <option value="300" selected>5 minutes</option>
+        <option value="600">10 minutes</option>
+        <option value="custom">Custom</option>
+      </select>
+      <div class="custom-time" id="customTimeWrap">
+        <input type="text" id="customTime" placeholder="Enter seconds e.g. 90" maxlength="6" autocomplete="off">
+      </div>
+    </div>
+    <div class="field">
+      <label>MISTAKE MODE</label>
+      <select id="createMode">
+        <option value="elimination">Elimination — wrong word ends the game</option>
+        <option value="penalty">Penalty — wrong word costs 3 points</option>
+      </select>
+    </div>
+    <div id="createErr" class="msg err"></div>
+    <button class="btn btn-primary" onclick="createRoom()">CREATE ROOM</button>
+  </div>
+
+  <div class="divider">OR JOIN</div>
+
+  <div class="panel">
+    <div class="panel-title">JOIN ROOM</div>
+    <div class="field">
+      <label>YOUR NAME</label>
+      <input type="text" id="joinName" placeholder="Enter name..." maxlength="16" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>ROOM CODE</label>
+      <input type="text" id="joinCode" placeholder="XXXXX" maxlength="5"
+             autocomplete="off" style="letter-spacing:6px;text-transform:uppercase"
+             oninput="this.value=this.value.toUpperCase()">
+    </div>
+    <div id="joinErr" class="msg err"></div>
+    <button class="btn btn-primary" onclick="joinRoom()">JOIN ROOM</button>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">HOW TO PLAY</div>
+    <ul class="rules">
+      <li>One player creates a room, shares the code</li>
+      <li>Players take turns entering real English words</li>
+      <li>Each word must start with the last letter of the previous word</li>
+      <li>Example: <span style="color:var(--p1)">tiger</span> → <span style="color:var(--p2)">rabbit</span> → <span style="color:var(--p1)">thorn</span></li>
+      <li>Wrong starting letter = loss or penalty</li>
+      <li>Repeated word = loss or penalty</li>
+      <li>Fake word = loss or penalty</li>
+      <li>Timer runs out on your turn = loss or penalty</li>
+      <li>Game ends when time runs out — highest score wins</li>
+    </ul>
+    <div class="pts-note">
+      SCORING: <span>1pt</span> per letter over 3 &nbsp;+&nbsp;
+      <span>+1</span> bonus for 5+ letters &nbsp;+&nbsp;
+      <span>+3</span> bonus for 7+ letters
+    </div>
+  </div>
+</div>
+
+<!-- ══ WAITING ══ -->
+<div class="screen hidden" id="waitingScreen">
+  <div class="panel" style="text-align:center">
+    <div class="panel-title" style="text-align:center">ROOM CODE</div>
+    <div class="room-code-display" id="roomCodeDisplay">XXXXX</div>
+    <div class="waiting-status">Waiting for opponent<span class="dots"></span></div>
+    <div style="font-size:16px;color:var(--muted);margin-bottom:16px">Share this code with your friend</div>
+    <button class="btn btn-secondary" onclick="copyCode()">COPY CODE</button>
+    <div id="copyMsg" class="msg ok" style="margin-top:8px;text-align:center"></div>
+  </div>
+</div>
+
+<!-- ══ GAME ══ -->
+<div class="screen hidden" id="gameScreen">
+
+  <!-- Game duration clock -->
+  <div class="game-clock-bar" id="gameClockBar">
+    <div class="game-clock-top">
+      <span class="game-clock-label">GAME TIME LEFT</span>
+      <span class="game-clock-count" id="gameClockCount">5:00</span>
+    </div>
+    <div class="game-clock-bg"><div class="game-clock-fill" id="gameClockFill" style="width:100%"></div></div>
+  </div>
+
+  <!-- Turn timer -->
+  <div class="timer-wrap">
+    <div class="timer-top">
+      <span class="timer-label">TURN TIMER</span>
+      <span class="timer-count" id="timerCount">15</span>
+    </div>
+    <div class="timer-bar-bg"><div class="timer-bar-fill" id="timerFill"></div></div>
+  </div>
+
+  <!-- Scoreboard -->
+  <div class="scoreboard">
+    <div class="player-card" id="card0">
+      <div class="pname p1c" id="pname0">P1</div>
+      <div class="pscore p1c" id="pscore0">0</div>
+    </div>
+    <div class="vs-box"><span class="round-num" id="roundNum">1</span>RND</div>
+    <div class="player-card" id="card1">
+      <div class="pname p2c" id="pname1">P2</div>
+      <div class="pscore p2c" id="pscore1">0</div>
+    </div>
+  </div>
+
+  <!-- Last word info -->
+  <div class="info-bar" id="infoBar">
+    <span class="info-label">FIRST WORD — enter anything!</span>
+  </div>
+
+  <!-- Input panel -->
+  <div class="panel">
+    <div id="modeBadge" class="mode-badge"></div>
+    <div id="penaltyFlash" class="penalty-flash"></div>
+    <div class="your-turn-banner" id="yourTurnBanner">⚡ YOUR TURN</div>
+    <div class="turn-indicator" id="turnIndicator"></div>
+    <div class="input-row">
+      <input type="text" id="wordInput" placeholder="type a word..." maxlength="30"
+             autocomplete="off" autocorrect="off" autocapitalize="off"
+             onkeydown="if(event.key==='Enter')submitWord()">
+      <button class="btn-submit" id="submitBtn" onclick="submitWord()">GO</button>
+    </div>
+    <div class="feedback" id="feedback"></div>
+  </div>
+
+  <!-- Word log -->
+  <div class="panel">
+    <div class="log-title">WORDS PLAYED</div>
+    <div class="word-log" id="wordLog"><span style="color:var(--muted);font-size:15px">none yet...</span></div>
+  </div>
+
+  <!-- Game actions -->
+  <div class="game-actions">
+    <button class="btn-danger" onclick="requestEnd()">END GAME</button>
+    <button class="btn btn-secondary" style="font-size:16px;padding:8px 18px" onclick="giveUp()">GIVE UP</button>
+  </div>
+</div>
+
+<!-- ══ GAME OVER ══ -->
+<div class="screen hidden" id="overScreen">
+  <div class="panel">
+    <span class="trophy" id="overTrophy">🏆</span>
+    <div class="winner-label" id="overLabel">WINNER</div>
+    <div class="winner-name" id="overWinner"></div>
+    <div class="over-reason" id="overReason"></div>
+    <div class="final-scores">
+      <div class="fcard" id="fcard0"><div class="fname p1c" id="fname0"></div><div class="fscore p1c" id="fscore0"></div></div>
+      <div class="fcard" id="fcard1"><div class="fname p2c" id="fname1"></div><div class="fscore p2c" id="fscore1"></div></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <button class="btn btn-primary" id="rematchBtn" style="flex:1" onclick="requestRematch()">⚔ REMATCH</button>
+      <button class="btn btn-secondary" style="flex:1;font-size:14px;padding:12px 14px;display:block" onclick="backToLobby()">🏠 MAIN MENU</button>
+    </div>
+    <div id="rematchStatus" class="msg info" style="text-align:center;margin-top:8px"></div>
+  </div>
+  <div class="panel">
+    <div class="log-title">ALL WORDS PLAYED</div>
+    <div class="word-log" id="overLog"></div>
+  </div>
+</div>
+
+<script>
+const SERVER_URL = 'wordduel-production.up.railway.app';
+
+let socket = null;
+let G = {
+  myId:null, myName:'', roomCode:'', players:[], myIndex:-1,
+  currentPlayer:'', turnDuration:15, turnLeft:0, turnInterval:null,
+  gameDuration:0, gameEndsAt:null, gameClockInterval:null,
+  round:1, wordLog:[], mode:'elimination', lastWord:'', expectedStart:'',
+};
+
+// ── CUSTOM DURATION TOGGLE ──
+function onDurationChange() {
+  const val = document.getElementById('gameDuration').value;
+  document.getElementById('customTimeWrap').style.display = val === 'custom' ? 'block' : 'none';
+}
+
+// ── CONNECT ──
+function connect() {
+  if (socket && socket.connected) return;
+  socket = io(SERVER_URL, { transports: ['websocket','polling'] });
+  socket.on('connect', () => { G.myId = socket.id; });
+
+  socket.on('roomCreated', ({ code, mode, turnSeconds, gameDuration }) => {
+    G.roomCode = code; G.mode = mode; G.turnDuration = turnSeconds; G.gameDuration = gameDuration;
+    document.getElementById('roomCodeDisplay').textContent = code;
+    show('waitingScreen');
+  });
+
+  socket.on('gameStart', ({ players, currentPlayer, mode, turnSeconds, gameDuration, gameEndsAt }) => {
+    G.players = players;
+    G.myIndex = players.findIndex(p => p.id === G.myId);
+    G.currentPlayer = currentPlayer; G.mode = mode;
+    G.turnDuration = turnSeconds; G.turnLeft = turnSeconds;
+    G.gameDuration = gameDuration; G.gameEndsAt = gameEndsAt;
+    G.round = 1; G.wordLog = []; G.lastWord = ''; G.expectedStart = '';
+    resetRematchUI();
+    document.getElementById('wordLog').innerHTML = '<span style="color:var(--muted);font-size:15px">none yet...</span>';
+    document.getElementById('feedback').textContent = '';
+    document.getElementById('wordInput').value = '';
+    document.getElementById('penaltyFlash').style.display = 'none';
+    document.getElementById('modeBadge').textContent = mode === 'elimination' ? '☠ ELIMINATION' : '⚠ PENALTY MODE';
+    document.getElementById('modeBadge').className = 'mode-badge ' + (mode==='elimination'?'elim':'pen');
+    renderGame(); show('gameScreen');
+    startTurnTimer(); startGameClock();
+  });
+
+  socket.on('wordAccepted', ({ word, pts, playedBy, scores, currentPlayer, expectedStart, gameEndsAt }) => {
+    G.players.forEach(p => { const s=scores.find(x=>x.name===p.name); if(s) p.score=s.score; });
+    G.currentPlayer=currentPlayer; G.lastWord=word; G.expectedStart=expectedStart; G.round++;
+    if (gameEndsAt) G.gameEndsAt = gameEndsAt;
+    G.wordLog.push({ word, pts, name:playedBy, idx:G.players.findIndex(p=>p.name===playedBy) });
+    addChip(G.wordLog[G.wordLog.length-1]);
+    document.getElementById('feedback').textContent='';
+    document.getElementById('wordInput').value='';
+    renderGame(); resetTurnTimer();
+    if (isMyTurn()) document.getElementById('wordInput').focus();
+  });
+
+  socket.on('penalty', ({ penalisedPlayer, reason, scores, currentPlayer, lastWord, expectedStart, gameEndsAt }) => {
+    G.players.forEach(p => { const s=scores.find(x=>x.name===p.name); if(s) p.score=s.score; });
+    G.currentPlayer=currentPlayer; G.lastWord=lastWord; G.expectedStart=expectedStart;
+    if (gameEndsAt) G.gameEndsAt = gameEndsAt;
+    const flash = document.getElementById('penaltyFlash');
+    flash.textContent = `⚠ ${penalisedPlayer}: ${reason} — -3 pts`;
+    flash.style.display='block';
+    setTimeout(()=>flash.style.display='none', 3000);
+    document.getElementById('wordInput').value='';
+    renderGame(); resetTurnTimer();
+    if (isMyTurn()) document.getElementById('wordInput').focus();
+  });
+
+  socket.on('checking', () => { setFeedback('Checking dictionary...','info'); lockInput(true); });
+  socket.on('wordError', msg => { setFeedback(msg,'err'); lockInput(false); shakeInput(); });
+
+  // Opponent wants to end
+  socket.on('endGameRequest', ({ from }) => {
+    document.getElementById('endModalMsg').textContent = `${from} wants to end the game. Winner decided by score.`;
+    document.getElementById('endModal').classList.add('visible');
+  });
+
+  socket.on('endGameDeclined', ({ by }) => {
+    document.getElementById('endModal').classList.remove('visible');
+    setFeedback(`${by} declined to end the game.`, 'err');
+    setTimeout(()=>setFeedback('',''), 3000);
+  });
+
+  socket.on('rematchRequested', ({ from }) => {
+    const btn = document.getElementById('rematchBtn');
+    if (btn) {
+      btn.textContent = '⚔ ACCEPT REMATCH!';
+      btn.disabled = false;
+      btn.className = 'btn btn-primary pulse-anim';
+    }
+    const status = document.getElementById('rematchStatus');
+    if (status) status.textContent = `> ${from} wants a rematch!`;
+  });
+
+  socket.on('rematchPending', () => {
+    const btn = document.getElementById('rematchBtn');
+    if (btn) {
+      btn.textContent = '⏳ WAITING...';
+      btn.disabled = true;
+    }
+    const status = document.getElementById('rematchStatus');
+    if (status) status.textContent = '> Waiting for opponent to accept...';
+  });
+
+  socket.on('rematchDeclined', ({ reason }) => {
+    const btn = document.getElementById('rematchBtn');
+    if (btn) {
+      btn.textContent = '⚔ REMATCH';
+      btn.disabled = true;
+      btn.className = 'btn btn-primary';
+    }
+    const status = document.getElementById('rematchStatus');
+    if (status) status.textContent = `> ${reason || 'Opponent left.'}`;
+  });
+
+  socket.on('gameOver', ({ reason, winner, draw, scores }) => {
+    clearTurnTimer(); clearGameClock();
+    resetRematchUI();
+    document.getElementById('endModal').classList.remove('visible');
+    if (draw) {
+      document.getElementById('overTrophy').textContent = '🤝';
+      document.getElementById('overLabel').textContent = 'DRAW!';
+      document.getElementById('overWinner').textContent = 'IT\'S A TIE';
+      document.getElementById('overWinner').style.color = 'var(--accent)';
+    } else {
+      document.getElementById('overTrophy').textContent = '🏆';
+      document.getElementById('overLabel').textContent = 'WINNER';
+      document.getElementById('overWinner').textContent = winner.toUpperCase();
+      document.getElementById('overWinner').style.color =
+        G.players.findIndex(p=>p.name===winner)===0 ? 'var(--p1)' : 'var(--p2)';
+    }
+    document.getElementById('overReason').innerHTML = `> <span>${reason}</span>`;
+    scores.forEach((s,i) => {
+      document.getElementById('fname'+i).textContent = s.name;
+      document.getElementById('fscore'+i).textContent = s.score;
+      document.getElementById('fcard'+i).className = 'fcard' + (!draw && s.name===winner ? ' winner' : '');
+    });
+    const ol = document.getElementById('overLog');
+    ol.innerHTML = G.wordLog.length ? '' : '<span style="color:var(--muted)">No words played.</span>';
+    G.wordLog.forEach(e => {
+      const c = document.createElement('div');
+      c.className = 'chip c'+(e.idx+1);
+      c.innerHTML = e.word + `<span class="pts">+${e.pts}</span>`;
+      ol.appendChild(c);
+    });
+    show('overScreen');
+  });
+
+  socket.on('error', msg => { document.getElementById('joinErr').textContent = '> '+msg; });
+  socket.on('disconnect', () => {
+    if (document.getElementById('gameScreen').classList.contains('hidden')) return;
+    clearTurnTimer(); clearGameClock();
+    document.getElementById('overTrophy').textContent = '⚡';
+    document.getElementById('overLabel').textContent = 'DISCONNECTED';
+    document.getElementById('overWinner').textContent = '—';
+    document.getElementById('overReason').innerHTML = '> <span>Connection lost</span>';
+    show('overScreen');
+  });
+}
+
+// ── ACTIONS ──
+function createRoom() {
+  const name = document.getElementById('createName').value.trim();
+  if (!name) { document.getElementById('createErr').textContent='> Enter your name'; return; }
+  let gameSecs = parseInt(document.getElementById('gameDuration').value) || 0;
+  if (document.getElementById('gameDuration').value === 'custom') {
+    gameSecs = parseInt(document.getElementById('customTime').value) || 0;
+    if (!gameSecs || gameSecs < 30) { document.getElementById('createErr').textContent='> Enter a valid time (min 30 seconds)'; return; }
+  }
+  document.getElementById('createErr').textContent='';
+  G.myName = name; connect();
+  socket.emit('createRoom', {
+    name,
+    turnSeconds: parseInt(document.getElementById('createTimer').value),
+    gameDuration: gameSecs,
+    mode: document.getElementById('createMode').value
+  });
+}
+
+function joinRoom() {
+  const name = document.getElementById('joinName').value.trim();
+  const code = document.getElementById('joinCode').value.trim().toUpperCase();
+  if (!name) { document.getElementById('joinErr').textContent='> Enter your name'; return; }
+  if (code.length!==5) { document.getElementById('joinErr').textContent='> Enter the 5-letter room code'; return; }
+  document.getElementById('joinErr').textContent='';
+  G.myName = name; connect();
+  socket.emit('joinRoom', { name, code });
+}
+
+function submitWord() {
+  if (!isMyTurn()) return;
+  const word = document.getElementById('wordInput').value.trim().toLowerCase();
+  if (!word) { giveUp(); return; }
+  lockInput(true);
+  socket.emit('submitWord', { word });
+}
+
+function giveUp() {
+  if (confirm('Give up and lose the game?')) socket.emit('giveUp');
+}
+
+function requestEnd() {
+  socket.emit('requestEndGame');
+  setFeedback('End game request sent — waiting for opponent...', 'info');
+}
+
+function acceptEnd() {
+  document.getElementById('endModal').classList.remove('visible');
+  socket.emit('acceptEndGame');
+}
+
+function declineEnd() {
+  document.getElementById('endModal').classList.remove('visible');
+  socket.emit('declineEndGame');
+}
+
+function copyCode() {
+  navigator.clipboard.writeText(G.roomCode).then(() => {
+    document.getElementById('copyMsg').textContent='> Copied!';
+    setTimeout(()=>document.getElementById('copyMsg').textContent='', 2000);
+  });
+}
+
+function requestRematch() {
+  if (!socket) return;
+  socket.emit('requestRematch');
+}
+
+function resetRematchUI() {
+  const btn = document.getElementById('rematchBtn');
+  if (btn) {
+    btn.textContent = '⚔ REMATCH';
+    btn.disabled = false;
+    btn.className = 'btn btn-primary';
+  }
+  const status = document.getElementById('rematchStatus');
+  if (status) status.textContent = '';
+}
+
+function backToLobby() {
+  clearTurnTimer(); clearGameClock();
+  resetRematchUI();
+  if (socket) socket.disconnect(); socket=null;
+  G = { myId:null,myName:'',roomCode:'',players:[],myIndex:-1,currentPlayer:'',
+    turnDuration:15,turnLeft:0,turnInterval:null,gameDuration:0,gameEndsAt:null,
+    gameClockInterval:null,round:1,wordLog:[],mode:'elimination',lastWord:'',expectedStart:'' };
+  ['createName','joinName','joinCode'].forEach(id=>document.getElementById(id).value='');
+  show('lobbyScreen');
+}
+
+// ── TURN TIMER ──
+function startTurnTimer() {
+  clearTurnTimer(); G.turnLeft=G.turnDuration; renderTurnTimer();
+  G.turnInterval = setInterval(()=>{
+    G.turnLeft = Math.max(0, G.turnLeft-1); renderTurnTimer();
+  }, 1000);
+}
+function resetTurnTimer() { startTurnTimer(); }
+function clearTurnTimer() { clearInterval(G.turnInterval); G.turnInterval=null; }
+function renderTurnTimer() {
+  const pct = G.turnLeft/G.turnDuration;
+  const col = pct>.5?'#39ff14':pct>.25?'#ff8c00':'#ff3a3a';
+  const fill=document.getElementById('timerFill'), cnt=document.getElementById('timerCount');
+  fill.style.width=(pct*100)+'%'; fill.style.background=col; fill.style.boxShadow=`0 0 8px ${col}`;
+  cnt.style.color=col; cnt.textContent=G.turnLeft;
+  cnt.classList.toggle('pulse-anim', G.turnLeft<=5);
+}
+
+// ── GAME CLOCK ──
+function startGameClock() {
+  clearGameClock();
+  if (!G.gameEndsAt) { document.getElementById('gameClockBar').style.display='none'; return; }
+  document.getElementById('gameClockBar').style.display='block';
+  renderGameClock();
+  G.gameClockInterval = setInterval(renderGameClock, 1000);
+}
+function clearGameClock() { clearInterval(G.gameClockInterval); G.gameClockInterval=null; }
+function renderGameClock() {
+  if (!G.gameEndsAt) return;
+  const remaining = Math.max(0, Math.round((G.gameEndsAt - Date.now())/1000));
+  const total = G.gameDuration;
+  const pct = remaining/total;
+  const mins = Math.floor(remaining/60);
+  const secs = remaining%60;
+  document.getElementById('gameClockCount').textContent = `${mins}:${secs.toString().padStart(2,'0')}`;
+  document.getElementById('gameClockFill').style.width = (pct*100)+'%';
+}
+
+// ── RENDER ──
+function isMyTurn() { return G.currentPlayer===G.myId; }
+
+function renderGame() {
+  G.players.forEach((p,i)=>{
+    document.getElementById('pname'+i).textContent=p.name;
+    document.getElementById('pscore'+i).textContent=p.score;
+    let cls='player-card';
+    if (i===0&&G.currentPlayer===p.id) cls+=' active-p1';
+    if (i===1&&G.currentPlayer===p.id) cls+=' active-p2';
+    if (p.id===G.myId) cls+=' me-tag';
+    document.getElementById('card'+i).className=cls;
+  });
+  document.getElementById('roundNum').textContent=G.round;
+  const infoBar=document.getElementById('infoBar');
+  if (G.lastWord) {
+    infoBar.innerHTML=`
+      <span class="info-label">LAST WORD</span>
+      <span class="last-word">${G.lastWord.toUpperCase()}</span>
+      <span class="start-letter">NEXT STARTS WITH<span>${G.expectedStart.toUpperCase()}</span></span>`;
+  } else {
+    infoBar.innerHTML=`<span class="info-label">FIRST WORD — enter anything!</span>`;
+  }
+  const myTurn=isMyTurn();
+  const curName=G.players.find(p=>p.id===G.currentPlayer)?.name||'?';
+  const col=G.players.findIndex(p=>p.id===G.currentPlayer)===0?'var(--p1)':'var(--p2)';
+  document.getElementById('yourTurnBanner').style.display=myTurn?'block':'none';
+  document.getElementById('turnIndicator').innerHTML=myTurn
+    ?`<span class="turn-name" style="color:var(--accent)">YOUR TURN</span>`
+    :`<span style="color:var(--muted)">WAITING FOR </span><span class="turn-name" style="color:${col}">${curName.toUpperCase()}</span>`;
+  lockInput(!myTurn);
+}
+
+function addChip(entry) {
+  const log=document.getElementById('wordLog');
+  if (log.querySelector('span')) log.innerHTML='';
+  const c=document.createElement('div');
+  c.className='chip c'+(entry.idx+1);
+  c.innerHTML=entry.word+`<span class="pts">+${entry.pts}</span>`;
+  log.appendChild(c); log.scrollTop=log.scrollHeight;
+}
+
+function lockInput(on) {
+  document.getElementById('wordInput').disabled=on;
+  document.getElementById('submitBtn').disabled=on;
+  if (!on) setFeedback('','');
+}
+function setFeedback(msg,type) {
+  const fb=document.getElementById('feedback');
+  fb.textContent=msg?'> '+msg:''; fb.className='feedback '+type;
+}
+function shakeInput() {
+  const inp=document.getElementById('wordInput');
+  inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
+  setTimeout(()=>inp.classList.remove('shake'),400); lockInput(false);
+}
+function show(id) {
+  ['lobbyScreen','waitingScreen','gameScreen','overScreen'].forEach(s=>
+    document.getElementById(s).classList.toggle('hidden',s!==id));
+}
+</script>
+</body>
+</html>
