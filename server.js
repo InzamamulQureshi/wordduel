@@ -12,7 +12,11 @@ const io = new Server(server, { cors: { origin: '*', methods: ['GET', 'POST'] } 
 const rooms = {};
 
 function makeCode() {
-  return Math.random().toString(36).slice(2, 7).toUpperCase();
+  let code;
+  do {
+    code = Math.random().toString(36).slice(2, 7).toUpperCase();
+  } while (rooms[code] || code.length < 5);
+  return code;
 }
 
 // ── SCORING ──
@@ -29,19 +33,20 @@ function scoreWord(word) {
 // lookup that will match near-misses and even gibberish), dictionaryapi.dev
 // returns actual dictionary entries: 200 for a real word, 404 for anything else.
 async function isRealWord(word) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
     const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`, {
       signal: controller.signal,
     });
-    clearTimeout(timeout);
     if (res.status === 404) return false;
     if (!res.ok) return true; // fail open on unexpected API errors (5xx etc.)
     const data = await res.json();
     return Array.isArray(data) && data.length > 0;
   } catch {
     return true; // fail open if the API is unreachable/timed out
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -75,10 +80,11 @@ function endGameByTime(room) {
   if (room.phase !== 'playing') return;
   clearRoomTimer(room);
   clearGameClock(room);
+  room.isChecking = false;
   room.phase = 'over';
   const scores = room.players.map(p => ({ name: p.name, score: p.score }));
   const sorted = [...room.players].sort((a, b) => b.score - a.score);
-  const winner = sorted[0].score === sorted[1].score ? null : sorted[0];
+  const winner = sorted.length > 1 && sorted[0].score === sorted[1].score ? null : sorted[0];
   io.to(room.code).emit('gameOver', {
     reason: "Time's up!",
     winner: winner ? winner.name : null,
@@ -90,6 +96,7 @@ function endGameByTime(room) {
 // ── MISTAKE HANDLER ──
 function handleMistake(room, loserSocketId, reason) {
   clearRoomTimer(room);
+  room.isChecking = false;
   const loser = room.players.find(p => p.id === loserSocketId);
   if (!loser || room.phase !== 'playing') return;
 
@@ -182,6 +189,7 @@ io.on('connection', socket => {
     const room = rooms[code];
     if (!room || room.phase !== 'playing') return;
     if (room.currentPlayer !== socket.id) { socket.emit('error', 'Not your turn.'); return; }
+    if (room.isChecking) return;
     const word = rawWord.trim().toLowerCase();
     if (!/^[a-z]+$/.test(word)) { socket.emit('wordError', 'Letters only!'); return; }
     if (room.expectedStart && word[0] !== room.expectedStart) {
@@ -191,8 +199,12 @@ io.on('connection', socket => {
       handleMistake(room, socket.id, `repeated "${word}"`); return;
     }
 
+    room.isChecking = true;
     socket.emit('checking');
     const valid = await isRealWord(word);
+    room.isChecking = false;
+
+    if (room.phase !== 'playing') return;
     if (!valid) {
       handleMistake(room, socket.id, `"${word}" is not a valid word`); return;
     }
