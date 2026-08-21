@@ -28,11 +28,46 @@ function scoreWord(word) {
   return Math.max(1, pts);
 }
 
-// ── DICTIONARY — dictionaryapi.dev ──
-// Unlike Datamuse's `sp=` endpoint (a fuzzy "did you mean" spelling-suggestion
-// lookup that will match near-misses and even gibberish), dictionaryapi.dev
-// returns actual dictionary entries: 200 for a real word, 404 for anything else.
-async function isRealWord(word) {
+// ── DICTIONARY SERVICE ──
+// Primary: Free Dictionary API (https://freedictionaryapi.com/)
+// Fallback: DictionaryAPI.dev (https://api.dictionaryapi.dev/)
+// FreeDictionaryAPI has a 1,000 req/hr per IP limit. When 429 is received or limit reached,
+// we catch it, activate fallback cooldown, and fall back to the old API (dictionaryapi.dev).
+
+let freeDictRateLimitedUntil = 0;
+
+async function checkFreeDictionaryApi(word) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    const res = await fetch(`https://freedictionaryapi.com/api/v1/entries/en/${encodeURIComponent(word)}`, {
+      signal: controller.signal,
+      headers: { 'Accept': 'application/json' }
+    });
+    if (res.status === 429) {
+      console.warn('[Dictionary] FreeDictionaryAPI rate limit reached (429). Falling back to backup dictionary.');
+      // Cooldown for 5 minutes before retrying FreeDictionaryAPI
+      freeDictRateLimitedUntil = Date.now() + 5 * 60 * 1000;
+      return { rateLimited: true };
+    }
+    if (res.status === 404) {
+      return { valid: false };
+    }
+    if (!res.ok) {
+      // 5xx or unexpected error: fall back to backup API
+      return { error: true };
+    }
+    const data = await res.json();
+    const isValid = !!(data && Array.isArray(data.entries) && data.entries.length > 0);
+    return { valid: isValid };
+  } catch {
+    return { error: true };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function checkOldDictionaryApi(word) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 5000);
   try {
@@ -48,6 +83,20 @@ async function isRealWord(word) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function isRealWord(word) {
+  // If not currently in rate-limit cooldown, try FreeDictionaryAPI first
+  if (Date.now() >= freeDictRateLimitedUntil) {
+    const result = await checkFreeDictionaryApi(word);
+    if (result.valid !== undefined) {
+      return result.valid;
+    }
+    // If rate-limited or error occurred, proceed to fallback
+  }
+
+  // Fall back to backup API (dictionaryapi.dev)
+  return await checkOldDictionaryApi(word);
 }
 
 // ── TURN TIMER ──
