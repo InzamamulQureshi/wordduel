@@ -1,10 +1,12 @@
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const app = express();
 app.use(cors());
-app.get('/', (_, res) => res.send('WordDuel server running'));
+app.use(express.static(__dirname));
+app.get('/', (_, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*', methods: ['GET', 'POST'] } });
@@ -19,7 +21,7 @@ function makeCode() {
   return code;
 }
 
-// ── SCORING ──
+// -- SCORING --
 function scoreWord(word) {
   const len = word.length;
   let pts = Math.max(0, len - 3);
@@ -28,13 +30,45 @@ function scoreWord(word) {
   return Math.max(1, pts);
 }
 
-// ── DICTIONARY SERVICE ──
+// -- DICTIONARY SERVICE --
 // Primary: Free Dictionary API (https://freedictionaryapi.com/)
 // Fallback: DictionaryAPI.dev (https://api.dictionaryapi.dev/)
 // FreeDictionaryAPI has a 1,000 req/hr per IP limit. When 429 is received or limit reached,
 // we catch it, activate fallback cooldown, and fall back to the old API (dictionaryapi.dev).
 
 let freeDictRateLimitedUntil = 0;
+
+function extractDefinitionFromFreeDict(data) {
+  if (!data || !Array.isArray(data.entries)) return '';
+  for (const entry of data.entries) {
+    if (Array.isArray(entry.senses)) {
+      for (const sense of entry.senses) {
+        if (sense.definition && typeof sense.definition === 'string' && sense.definition.trim()) {
+          return sense.definition.trim().replace(/-/g, '-');
+        }
+      }
+    }
+  }
+  return '';
+}
+
+function extractDefinitionFromOldDict(data) {
+  if (!data || !Array.isArray(data)) return '';
+  for (const entry of data) {
+    if (Array.isArray(entry.meanings)) {
+      for (const meaning of entry.meanings) {
+        if (Array.isArray(meaning.definitions)) {
+          for (const def of meaning.definitions) {
+            if (def.definition && typeof def.definition === 'string' && def.definition.trim()) {
+              return def.definition.trim().replace(/-/g, '-');
+            }
+          }
+        }
+      }
+    }
+  }
+  return '';
+}
 
 async function checkFreeDictionaryApi(word) {
   const controller = new AbortController();
@@ -51,7 +85,7 @@ async function checkFreeDictionaryApi(word) {
       return { rateLimited: true };
     }
     if (res.status === 404) {
-      return { valid: false };
+      return { valid: false, definition: '' };
     }
     if (!res.ok) {
       // 5xx or unexpected error: fall back to backup API
@@ -59,7 +93,8 @@ async function checkFreeDictionaryApi(word) {
     }
     const data = await res.json();
     const isValid = !!(data && Array.isArray(data.entries) && data.entries.length > 0);
-    return { valid: isValid };
+    const definition = isValid ? extractDefinitionFromFreeDict(data) : '';
+    return { valid: isValid, definition };
   } catch {
     return { error: true };
   } finally {
@@ -74,12 +109,14 @@ async function checkOldDictionaryApi(word) {
     const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`, {
       signal: controller.signal,
     });
-    if (res.status === 404) return false;
-    if (!res.ok) return true; // fail open on unexpected API errors (5xx etc.)
+    if (res.status === 404) return { valid: false, definition: '' };
+    if (!res.ok) return { valid: true, definition: '' }; // fail open on unexpected API errors (5xx etc.)
     const data = await res.json();
-    return Array.isArray(data) && data.length > 0;
+    const isValid = Array.isArray(data) && data.length > 0;
+    const definition = isValid ? extractDefinitionFromOldDict(data) : '';
+    return { valid: isValid, definition };
   } catch {
-    return true; // fail open if the API is unreachable/timed out
+    return { valid: true, definition: '' }; // fail open if unreachable
   } finally {
     clearTimeout(timeout);
   }
@@ -90,7 +127,7 @@ async function isRealWord(word) {
   if (Date.now() >= freeDictRateLimitedUntil) {
     const result = await checkFreeDictionaryApi(word);
     if (result.valid !== undefined) {
-      return result.valid;
+      return result;
     }
     // If rate-limited or error occurred, proceed to fallback
   }
@@ -99,7 +136,7 @@ async function isRealWord(word) {
   return await checkOldDictionaryApi(word);
 }
 
-// ── TURN TIMER ──
+// -- TURN TIMER --
 function clearRoomTimer(room) {
   if (room.timerRef) { clearTimeout(room.timerRef); room.timerRef = null; }
 }
@@ -112,7 +149,7 @@ function startTurnTimer(room) {
   }, room.turnSeconds * 1000);
 }
 
-// ── GAME CLOCK (total game duration) ──
+// -- GAME CLOCK (total game duration) --
 function startGameClock(room) {
   if (!room.gameDuration) return; // 0 = no limit
   room.gameEndsAt = Date.now() + room.gameDuration * 1000;
@@ -142,7 +179,7 @@ function endGameByTime(room) {
   });
 }
 
-// ── MISTAKE HANDLER ──
+// -- MISTAKE HANDLER --
 function handleMistake(room, loserSocketId, reason) {
   clearRoomTimer(room);
   room.isChecking = false;
@@ -169,6 +206,7 @@ function handleMistake(room, loserSocketId, reason) {
         scores: room.players.map(p => ({ name: p.name, score: p.score })),
         currentPlayer: room.currentPlayer,
         lastWord: room.lastWord,
+        definition: room.lastDefinition || '',
         expectedStart: room.expectedStart,
         gameEndsAt: null,
         isSolo: true,
@@ -198,6 +236,7 @@ function handleMistake(room, loserSocketId, reason) {
       scores: room.players.map(p => ({ name: p.name, score: p.score })),
       currentPlayer: room.currentPlayer,
       lastWord: room.lastWord,
+      definition: room.lastDefinition || '',
       expectedStart: room.expectedStart,
       gameEndsAt: room.gameEndsAt || null,
       isSolo: false,
@@ -206,7 +245,7 @@ function handleMistake(room, loserSocketId, reason) {
   }
 }
 
-// ── SOCKET EVENTS ──
+// -- SOCKET EVENTS --
 io.on('connection', socket => {
   console.log('connect', socket.id);
 
@@ -223,6 +262,7 @@ io.on('connection', socket => {
       players: [{ id: socket.id, name: name || 'Player', score: 0 }],
       usedWords: new Set(),
       lastWord: null,
+      lastDefinition: null,
       expectedStart: null,
       currentPlayer: socket.id,
       timerRef: null,
@@ -260,6 +300,7 @@ io.on('connection', socket => {
       players: [{ id: socket.id, name, score: 0 }],
       usedWords: new Set(),
       lastWord: null,
+      lastDefinition: null,
       expectedStart: null,
       currentPlayer: null,
       timerRef: null,
@@ -320,7 +361,7 @@ io.on('connection', socket => {
 
     room.isChecking = true;
     socket.emit('checking');
-    const valid = await isRealWord(word);
+    const { valid, definition } = await isRealWord(word);
     room.isChecking = false;
 
     if (room.phase !== 'playing') return;
@@ -333,10 +374,13 @@ io.on('connection', socket => {
     player.score += pts;
     room.usedWords.add(word);
     room.lastWord = word;
+    room.lastDefinition = definition || '';
     room.expectedStart = word[word.length - 1];
     room.currentPlayer = room.isSolo ? socket.id : room.players.find(p => p.id !== socket.id)?.id;
     io.to(room.code).emit('wordAccepted', {
-      word, pts,
+      word,
+      definition: room.lastDefinition,
+      pts,
       playedBy: player.name,
       scores: room.players.map(p => ({ name: p.name, score: p.score })),
       currentPlayer: room.currentPlayer,
@@ -428,6 +472,7 @@ io.on('connection', socket => {
       room.phase = 'playing';
       room.usedWords = new Set();
       room.lastWord = null;
+      room.lastDefinition = null;
       room.expectedStart = null;
       room.players[0].score = 0;
       room.currentPlayer = socket.id;
@@ -460,6 +505,7 @@ io.on('connection', socket => {
       room.phase = 'playing';
       room.usedWords = new Set();
       room.lastWord = null;
+      room.lastDefinition = null;
       room.expectedStart = null;
       room.endVotes = new Set();
       room.rematchVotes = new Set();

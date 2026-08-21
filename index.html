@@ -103,7 +103,8 @@ select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:u
 /* INFO BAR */
 .info-bar{background:#0d0d15;border:1px solid var(--border);border-radius:3px;padding:10px 14px;margin-bottom:12px;display:flex;flex-direction:column;gap:4px}
 .info-label{color:var(--muted);font-size:14px}
-.last-word{font-size:clamp(18px,6vw,26px);font-weight:bold;letter-spacing:2px;word-break:break-all}
+.last-word{font-size:clamp(18px,6vw,26px);font-weight:bold;letter-spacing:2px;word-break:break-word}
+.word-def{font-size:16px;color:var(--text);font-weight:normal;letter-spacing:0;opacity:.85}
 .start-letter{font-size:14px;color:var(--muted)}
 .start-letter span{font-size:clamp(20px,6vw,28px);color:var(--accent);text-shadow:0 0 12px rgba(255,233,74,.5);vertical-align:middle;margin-left:4px}
 
@@ -205,12 +206,12 @@ select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:u
 <!-- == LOBBY == -->
 <div class="screen" id="lobbyScreen">
   <div class="mode-tabs">
-    <button class="mode-tab active" id="tabSolo" onclick="switchLobbyTab('solo')">SOLO ENDLESS</button>
-    <button class="mode-tab" id="tabMulti" onclick="switchLobbyTab('multi')">MULTIPLAYER</button>
+    <button class="mode-tab active" id="tabMulti" onclick="switchLobbyTab('multi')">MULTIPLAYER</button>
+    <button class="mode-tab" id="tabSolo" onclick="switchLobbyTab('solo')">SOLO ENDLESS</button>
   </div>
 
   <!-- SOLO ENDLESS PANEL -->
-  <div id="soloPanel" class="panel">
+  <div id="soloPanel" class="panel" style="display:none">
     <div class="panel-title">SOLO ENDLESS MODE</div>
     <div class="personal-best-box">
       <div>BEST SCORE: <span id="pbScore">0</span></div>
@@ -243,7 +244,7 @@ select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:u
   </div>
 
   <!-- MULTIPLAYER PANEL -->
-  <div id="multiPanel" style="display:none">
+  <div id="multiPanel">
     <div class="panel">
       <div class="panel-title">CREATE ROOM</div>
       <div class="field">
@@ -392,7 +393,7 @@ select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:u
   <!-- Word log -->
   <div class="panel">
     <div class="log-title">WORDS PLAYED</div>
-    <div class="word-log" id="wordLog"><span style="color:var(--muted);font-size:15px">none yet...</span></div>
+    <div class="word-log" id="wordLog"><span class="empty-log" style="color:var(--muted);font-size:15px">none yet...</span></div>
   </div>
 
   <!-- Game actions -->
@@ -427,16 +428,19 @@ select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:u
 </div>
 
 <script>
-const SERVER_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? 'http://localhost:3001'
-  : 'https://wordduel-production.up.railway.app';
+const BACKEND_URL = 'https://wordduel-production.up.railway.app';
+const SERVER_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? (window.location.port ? `${window.location.protocol}//${window.location.hostname}:${window.location.port}` : 'http://localhost:3001')
+  : (window.location.protocol === 'file:'
+      ? 'http://localhost:3001'
+      : (window.location.hostname.includes('railway.app') ? window.location.origin : BACKEND_URL));
 
 let socket = null;
 let G = {
   myId:null, myName:'', roomCode:'', players:[], myIndex:-1,
   currentPlayer:'', turnDuration:15, turnLeft:0, turnInterval:null,
   gameDuration:0, gameEndsAt:null, gameClockInterval:null,
-  round:1, wordLog:[], mode:'elimination', lastWord:'', expectedStart:'',
+  round:1, wordLog:[], mode:'elimination', lastWord:'', lastDefinition:'', expectedStart:'',
   isSolo:false,
 };
 
@@ -516,10 +520,11 @@ function connect() {
     G.round = 1;
     G.wordLog = [];
     G.lastWord = '';
+    G.lastDefinition = '';
     G.expectedStart = '';
 
     resetRematchUI();
-    document.getElementById('wordLog').innerHTML = '<span style="color:var(--muted);font-size:15px">none yet...</span>';
+    document.getElementById('wordLog').innerHTML = '<span class="empty-log" style="color:var(--muted);font-size:15px">none yet...</span>';
     document.getElementById('feedback').textContent = '';
     document.getElementById('wordInput').value = '';
     document.getElementById('penaltyFlash').style.display = 'none';
@@ -563,10 +568,11 @@ function connect() {
     }
   });
 
-  socket.on('wordAccepted', ({ word, pts, playedBy, scores, currentPlayer, expectedStart, gameEndsAt, isSolo }) => {
+  socket.on('wordAccepted', ({ word, definition, pts, playedBy, scores, currentPlayer, expectedStart, gameEndsAt, isSolo }) => {
     G.players.forEach(p => { const s = scores.find(x => x.name === p.name); if (s) p.score = s.score; });
     G.currentPlayer = currentPlayer;
     G.lastWord = word;
+    G.lastDefinition = definition || '';
     G.expectedStart = expectedStart;
     G.round++;
     if (gameEndsAt) G.gameEndsAt = gameEndsAt;
@@ -581,10 +587,11 @@ function connect() {
     if (isMyTurn()) document.getElementById('wordInput').focus();
   });
 
-  socket.on('penalty', ({ penalisedPlayer, reason, scores, currentPlayer, lastWord, expectedStart, gameEndsAt, isSolo }) => {
+  socket.on('penalty', ({ penalisedPlayer, reason, scores, currentPlayer, lastWord, definition, expectedStart, gameEndsAt, isSolo }) => {
     G.players.forEach(p => { const s = scores.find(x => x.name === p.name); if (s) p.score = s.score; });
     G.currentPlayer = currentPlayer;
     G.lastWord = lastWord;
+    G.lastDefinition = definition || '';
     G.expectedStart = expectedStart;
     if (gameEndsAt) G.gameEndsAt = gameEndsAt;
     if (isSolo !== undefined) G.isSolo = !!isSolo;
@@ -853,13 +860,14 @@ function backToLobby() {
   G = {
     myId:null, myName:'', roomCode:'', players:[], myIndex:-1, currentPlayer:'',
     turnDuration:15, turnLeft:0, turnInterval:null, gameDuration:0, gameEndsAt:null,
-    gameClockInterval:null, round:1, wordLog:[], mode:'elimination', lastWord:'', expectedStart:'',
+    gameClockInterval:null, round:1, wordLog:[], mode:'elimination', lastWord:'', lastDefinition:'', expectedStart:'',
     isSolo:false
   };
   ['joinCode'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
+  switchLobbyTab('multi');
   updatePbDisplay();
   show('lobbyScreen');
 }
@@ -945,9 +953,10 @@ function renderGame() {
 
   const infoBar = document.getElementById('infoBar');
   if (G.lastWord) {
+    const defHtml = G.lastDefinition ? ` - <span class="word-def">${G.lastDefinition}</span>` : '';
     infoBar.innerHTML = `
       <span class="info-label">LAST WORD</span>
-      <span class="last-word">${G.lastWord.toUpperCase()}</span>
+      <span class="last-word">${G.lastWord.toUpperCase()}${defHtml}</span>
       <span class="start-letter">NEXT STARTS WITH<span>${G.expectedStart.toUpperCase()}</span></span>`;
   } else {
     infoBar.innerHTML = `<span class="info-label">FIRST WORD: enter anything!</span>`;
@@ -969,7 +978,8 @@ function renderGame() {
 
 function addChip(entry) {
   const log = document.getElementById('wordLog');
-  if (log.querySelector('span')) log.innerHTML = '';
+  const empty = log.querySelector('.empty-log');
+  if (empty) log.innerHTML = '';
   const c = document.createElement('div');
   c.className = 'chip c' + (entry.idx + 1);
   c.innerHTML = entry.word + `<span class="pts">+${entry.pts}</span>`;
