@@ -31,6 +31,16 @@ header{text-align:center;margin-bottom:24px;animation:fadeDown .6s ease both}
 .panel{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:20px;margin-bottom:12px;position:relative}
 .panel::before{content:'';position:absolute;inset:0;border-radius:4px;background:linear-gradient(135deg,rgba(255,255,255,.03) 0%,transparent 60%);pointer-events:none}
 .panel-title{font-family:'Press Start 2P',monospace;font-size:10px;color:var(--accent);margin-bottom:16px;letter-spacing:1px}
+
+/* MODE TABS */
+.mode-tabs{display:flex;gap:8px;margin-bottom:14px}
+.mode-tab{flex:1;font-family:'Press Start 2P',monospace;font-size:10px;padding:12px 8px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:3px;cursor:pointer;letter-spacing:1px;transition:all .2s;-webkit-tap-highlight-color:transparent}
+.mode-tab.active{background:var(--accent);color:#0a0a0f;border-color:var(--accent);box-shadow:0 0 15px rgba(255,233,74,.25)}
+
+/* PERSONAL BEST BAR */
+.personal-best-box{background:#0d0d15;border:1px solid var(--border);border-radius:3px;padding:10px 14px;margin-bottom:14px;display:flex;justify-content:space-around;font-size:16px;color:var(--muted)}
+.personal-best-box span{color:var(--accent);font-weight:bold;margin-left:4px}
+
 .field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
 .field label{font-size:15px;color:var(--muted);letter-spacing:1px}
 input[type=text],select{width:100%;background:#0d0d15;border:1px solid var(--border);border-radius:3px;color:var(--text);font-family:'VT323',monospace;font-size:22px;padding:9px 14px;outline:none;transition:border-color .2s}
@@ -78,11 +88,11 @@ select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:u
 .timer-bar-fill{height:100%;border-radius:4px;background:var(--green);transition:width .25s linear,background .3s;box-shadow:0 0 8px currentColor}
 
 /* SCOREBOARD */
-.scoreboard{display:grid;grid-template-columns:1fr 44px 1fr;align-items:center;gap:8px;margin-bottom:12px}
+.scoreboard{display:grid;grid-template-columns:1fr 50px 1fr;align-items:center;gap:8px;margin-bottom:12px}
 .player-card{padding:10px 8px;border-radius:3px;border:1px solid var(--border);text-align:center;transition:border-color .3s,background .3s;min-width:0;overflow:hidden}
 .player-card.active-p1{border-color:var(--p1);background:rgba(0,240,255,.05)}
 .player-card.active-p2{border-color:var(--p2);background:rgba(255,79,163,.05)}
-.player-card.me-tag .pname::after{content:' ★';font-size:9px;opacity:.6}
+.player-card.me-tag .pname::after{content:' *';font-size:11px;opacity:.6}
 .pname{font-size:clamp(10px,3vw,14px);font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pscore{font-size:clamp(22px,7vw,34px);font-weight:bold;line-height:1.1}
 .p1c{color:var(--p1);text-shadow:0 0 10px rgba(0,240,255,.4)}
@@ -137,9 +147,10 @@ select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:u
 .modal-btns .btn{flex:1;font-size:9px;padding:12px}
 
 /* GAME OVER */
-.trophy{font-size:46px;display:block;text-align:center;margin-bottom:6px;animation:bounce .6s ease both}
+.over-badge{font-family:'Press Start 2P',monospace;font-size:11px;color:var(--accent);text-align:center;margin-bottom:10px;letter-spacing:2px}
 .winner-label{font-family:'Press Start 2P',monospace;font-size:9px;color:var(--muted);letter-spacing:2px;text-align:center}
 .winner-name{font-size:clamp(22px,8vw,38px);font-weight:bold;margin:6px 0;word-break:break-word;text-align:center}
+.new-best-banner{background:rgba(255,233,74,.1);border:1px solid var(--accent);border-radius:3px;padding:8px 12px;font-size:16px;color:var(--accent);text-align:center;margin:10px 0;font-weight:bold;animation:fadeIn .3s ease}
 .final-scores{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
 .fcard{padding:12px 8px;border-radius:3px;border:1px solid var(--border);text-align:center}
 .fcard.winner{border-color:var(--accent);background:rgba(255,233,74,.05)}
@@ -159,7 +170,6 @@ select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:u
 @keyframes fadeDown{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 @keyframes chipPop{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)}}
-@keyframes bounce{0%,100%{transform:translateY(0)}40%{transform:translateY(-18px)}70%{transform:translateY(-8px)}}
 @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 .shake{animation:shake .35s ease}
@@ -176,8 +186,8 @@ select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:u
 </head>
 <body>
 <header>
-  <div class="title">⚔ WORD DUEL</div>
-  <div class="subtitle">MULTIPLAYER</div>
+  <div class="title">WORD DUEL</div>
+  <div class="subtitle">SOLO AND MULTIPLAYER</div>
 </header>
 
 <!-- END GAME CONFIRMATION MODAL -->
@@ -192,17 +202,28 @@ select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:u
   </div>
 </div>
 
-<!-- ══ LOBBY ══ -->
+<!-- == LOBBY == -->
 <div class="screen" id="lobbyScreen">
-  <div class="panel">
-    <div class="panel-title">CREATE ROOM</div>
+  <div class="mode-tabs">
+    <button class="mode-tab active" id="tabSolo" onclick="switchLobbyTab('solo')">SOLO ENDLESS</button>
+    <button class="mode-tab" id="tabMulti" onclick="switchLobbyTab('multi')">MULTIPLAYER</button>
+  </div>
+
+  <!-- SOLO ENDLESS PANEL -->
+  <div id="soloPanel" class="panel">
+    <div class="panel-title">SOLO ENDLESS MODE</div>
+    <div class="personal-best-box">
+      <div>BEST SCORE: <span id="pbScore">0</span></div>
+      <div>LONGEST CHAIN: <span id="pbChain">0</span></div>
+    </div>
     <div class="field">
       <label>YOUR NAME</label>
-      <input type="text" id="createName" placeholder="Enter name..." maxlength="16" autocomplete="off">
+      <input type="text" id="soloName" placeholder="Enter name..." maxlength="16" autocomplete="off">
     </div>
     <div class="field">
       <label>TURN TIMER</label>
-      <select id="createTimer">
+      <select id="soloTimer">
+        <option value="0">No Timer (Relaxed)</option>
         <option value="5">5 seconds</option>
         <option value="10">10 seconds</option>
         <option value="15" selected>15 seconds</option>
@@ -211,59 +232,88 @@ select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:u
       </select>
     </div>
     <div class="field">
-      <label>GAME DURATION</label>
-      <select id="gameDuration" onchange="onDurationChange()">
-        <option value="0">No Limit</option>
-        <option value="120">2 minutes</option>
-        <option value="300" selected>5 minutes</option>
-        <option value="600">10 minutes</option>
-        <option value="custom">Custom</option>
-      </select>
-      <div class="custom-time" id="customTimeWrap">
-        <input type="text" id="customTime" placeholder="Enter seconds e.g. 90" maxlength="6" autocomplete="off">
-      </div>
-    </div>
-    <div class="field">
       <label>MISTAKE MODE</label>
-      <select id="createMode">
-        <option value="elimination">Elimination — wrong word ends the game</option>
-        <option value="penalty">Penalty — wrong word costs 3 points</option>
+      <select id="soloMode">
+        <option value="elimination">Elimination - wrong word ends the run</option>
+        <option value="penalty">Penalty - wrong word costs 3 points</option>
       </select>
     </div>
-    <div id="createErr" class="msg err"></div>
-    <button class="btn btn-primary" onclick="createRoom()">CREATE ROOM</button>
+    <div id="soloErr" class="msg err"></div>
+    <button class="btn btn-primary" onclick="startSolo()">START SOLO RUN</button>
   </div>
 
-  <div class="divider">OR JOIN</div>
+  <!-- MULTIPLAYER PANEL -->
+  <div id="multiPanel" style="display:none">
+    <div class="panel">
+      <div class="panel-title">CREATE ROOM</div>
+      <div class="field">
+        <label>YOUR NAME</label>
+        <input type="text" id="createName" placeholder="Enter name..." maxlength="16" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>TURN TIMER</label>
+        <select id="createTimer">
+          <option value="5">5 seconds</option>
+          <option value="10">10 seconds</option>
+          <option value="15" selected>15 seconds</option>
+          <option value="20">20 seconds</option>
+          <option value="30">30 seconds</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>GAME DURATION</label>
+        <select id="gameDuration" onchange="onDurationChange()">
+          <option value="0">No Limit</option>
+          <option value="120">2 minutes</option>
+          <option value="300" selected>5 minutes</option>
+          <option value="600">10 minutes</option>
+          <option value="custom">Custom</option>
+        </select>
+        <div class="custom-time" id="customTimeWrap">
+          <input type="text" id="customTime" placeholder="Enter seconds e.g. 90" maxlength="6" autocomplete="off">
+        </div>
+      </div>
+      <div class="field">
+        <label>MISTAKE MODE</label>
+        <select id="createMode">
+          <option value="elimination">Elimination - wrong word ends the game</option>
+          <option value="penalty">Penalty - wrong word costs 3 points</option>
+        </select>
+      </div>
+      <div id="createErr" class="msg err"></div>
+      <button class="btn btn-primary" onclick="createRoom()">CREATE ROOM</button>
+    </div>
 
-  <div class="panel">
-    <div class="panel-title">JOIN ROOM</div>
-    <div class="field">
-      <label>YOUR NAME</label>
-      <input type="text" id="joinName" placeholder="Enter name..." maxlength="16" autocomplete="off">
+    <div class="divider">OR JOIN</div>
+
+    <div class="panel">
+      <div class="panel-title">JOIN ROOM</div>
+      <div class="field">
+        <label>YOUR NAME</label>
+        <input type="text" id="joinName" placeholder="Enter name..." maxlength="16" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>ROOM CODE</label>
+        <input type="text" id="joinCode" placeholder="XXXXX" maxlength="5"
+               autocomplete="off" style="letter-spacing:6px;text-transform:uppercase"
+               oninput="this.value=this.value.toUpperCase()">
+      </div>
+      <div id="joinErr" class="msg err"></div>
+      <button class="btn btn-primary" onclick="joinRoom()">JOIN ROOM</button>
     </div>
-    <div class="field">
-      <label>ROOM CODE</label>
-      <input type="text" id="joinCode" placeholder="XXXXX" maxlength="5"
-             autocomplete="off" style="letter-spacing:6px;text-transform:uppercase"
-             oninput="this.value=this.value.toUpperCase()">
-    </div>
-    <div id="joinErr" class="msg err"></div>
-    <button class="btn btn-primary" onclick="joinRoom()">JOIN ROOM</button>
   </div>
 
   <div class="panel">
     <div class="panel-title">HOW TO PLAY</div>
     <ul class="rules">
-      <li>One player creates a room, shares the code</li>
-      <li>Players take turns entering real English words</li>
+      <li>Solo Endless: chain words against yourself to beat your high score</li>
+      <li>Multiplayer: one player creates a room and shares the 5-letter code</li>
       <li>Each word must start with the last letter of the previous word</li>
-      <li>Example: <span style="color:var(--p1)">tiger</span> → <span style="color:var(--p2)">rabbit</span> → <span style="color:var(--p1)">thorn</span></li>
+      <li>Example: <span style="color:var(--p1)">tiger</span> -> <span style="color:var(--p2)">rabbit</span> -> <span style="color:var(--p1)">thorn</span></li>
       <li>Wrong starting letter = loss or penalty</li>
       <li>Repeated word = loss or penalty</li>
       <li>Fake word = loss or penalty</li>
       <li>Timer runs out on your turn = loss or penalty</li>
-      <li>Game ends when time runs out — highest score wins</li>
     </ul>
     <div class="pts-note">
       SCORING: <span>1pt</span> per letter over 3 &nbsp;+&nbsp;
@@ -273,7 +323,7 @@ select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:u
   </div>
 </div>
 
-<!-- ══ WAITING ══ -->
+<!-- == WAITING == -->
 <div class="screen hidden" id="waitingScreen">
   <div class="panel" style="text-align:center">
     <div class="panel-title" style="text-align:center">ROOM CODE</div>
@@ -285,7 +335,7 @@ select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:u
   </div>
 </div>
 
-<!-- ══ GAME ══ -->
+<!-- == GAME == -->
 <div class="screen hidden" id="gameScreen">
 
   <!-- Game duration clock -->
@@ -298,7 +348,7 @@ select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:u
   </div>
 
   <!-- Turn timer -->
-  <div class="timer-wrap">
+  <div class="timer-wrap" id="timerWrap">
     <div class="timer-top">
       <span class="timer-label">TURN TIMER</span>
       <span class="timer-count" id="timerCount">15</span>
@@ -312,7 +362,7 @@ select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:u
       <div class="pname p1c" id="pname0">P1</div>
       <div class="pscore p1c" id="pscore0">0</div>
     </div>
-    <div class="vs-box"><span class="round-num" id="roundNum">1</span>RND</div>
+    <div class="vs-box"><span class="round-num" id="roundNum">1</span><span id="roundLabel">RND</span></div>
     <div class="player-card" id="card1">
       <div class="pname p2c" id="pname1">P2</div>
       <div class="pscore p2c" id="pscore1">0</div>
@@ -321,14 +371,14 @@ select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:u
 
   <!-- Last word info -->
   <div class="info-bar" id="infoBar">
-    <span class="info-label">FIRST WORD — enter anything!</span>
+    <span class="info-label">FIRST WORD: enter anything!</span>
   </div>
 
   <!-- Input panel -->
   <div class="panel">
     <div id="modeBadge" class="mode-badge"></div>
     <div id="penaltyFlash" class="penalty-flash"></div>
-    <div class="your-turn-banner" id="yourTurnBanner">⚡ YOUR TURN</div>
+    <div class="your-turn-banner" id="yourTurnBanner">YOUR TURN</div>
     <div class="turn-indicator" id="turnIndicator"></div>
     <div class="input-row">
       <input type="text" id="wordInput" placeholder="type a word..." maxlength="30"
@@ -346,26 +396,27 @@ select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:u
   </div>
 
   <!-- Game actions -->
-  <div class="game-actions">
-    <button class="btn-danger" onclick="requestEnd()">END GAME</button>
-    <button class="btn btn-secondary" style="font-size:16px;padding:8px 18px" onclick="giveUp()">GIVE UP</button>
+  <div class="game-actions" id="gameActions">
+    <button class="btn-danger" id="endGameBtn" onclick="requestEnd()">END GAME</button>
+    <button class="btn btn-secondary" id="giveUpBtn" style="font-size:16px;padding:8px 18px" onclick="giveUp()">GIVE UP</button>
   </div>
 </div>
 
-<!-- ══ GAME OVER ══ -->
+<!-- == GAME OVER == -->
 <div class="screen hidden" id="overScreen">
   <div class="panel">
-    <span class="trophy" id="overTrophy">🏆</span>
+    <div class="over-badge" id="overBadge">[ GAME OVER ]</div>
     <div class="winner-label" id="overLabel">WINNER</div>
     <div class="winner-name" id="overWinner"></div>
+    <div id="newBestBanner" class="new-best-banner" style="display:none">NEW PERSONAL BEST!</div>
     <div class="over-reason" id="overReason"></div>
     <div class="final-scores">
       <div class="fcard" id="fcard0"><div class="fname p1c" id="fname0"></div><div class="fscore p1c" id="fscore0"></div></div>
       <div class="fcard" id="fcard1"><div class="fname p2c" id="fname1"></div><div class="fscore p2c" id="fscore1"></div></div>
     </div>
     <div style="display:flex;gap:10px;margin-top:14px">
-      <button class="btn btn-primary" id="rematchBtn" style="flex:1" onclick="requestRematch()">⚔ REMATCH</button>
-      <button class="btn btn-secondary" style="flex:1;font-size:14px;padding:12px 14px;display:block" onclick="backToLobby()">🏠 MAIN MENU</button>
+      <button class="btn btn-primary" id="rematchBtn" style="flex:1" onclick="requestRematch()">REMATCH</button>
+      <button class="btn btn-secondary" style="flex:1;font-size:14px;padding:12px 14px;display:block" onclick="backToLobby()">MAIN MENU</button>
     </div>
     <div id="rematchStatus" class="msg info" style="text-align:center;margin-top:8px"></div>
   </div>
@@ -376,7 +427,9 @@ select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:u
 </div>
 
 <script>
-const SERVER_URL = 'https://wordduel-production.up.railway.app';
+const SERVER_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:3001'
+  : 'https://wordduel-production.up.railway.app';
 
 let socket = null;
 let G = {
@@ -384,15 +437,59 @@ let G = {
   currentPlayer:'', turnDuration:15, turnLeft:0, turnInterval:null,
   gameDuration:0, gameEndsAt:null, gameClockInterval:null,
   round:1, wordLog:[], mode:'elimination', lastWord:'', expectedStart:'',
+  isSolo:false,
 };
 
-// ── CUSTOM DURATION TOGGLE ──
+// Load saved preferences
+window.addEventListener('DOMContentLoaded', () => {
+  const savedName = localStorage.getItem('wordduel_name') || '';
+  if (savedName) {
+    const soloInp = document.getElementById('soloName');
+    const createInp = document.getElementById('createName');
+    const joinInp = document.getElementById('joinName');
+    if (soloInp) soloInp.value = savedName;
+    if (createInp) createInp.value = savedName;
+    if (joinInp) joinInp.value = savedName;
+  }
+  updatePbDisplay();
+});
+
+function updatePbDisplay() {
+  const pbScore = localStorage.getItem('wordduel_pb_score') || '0';
+  const pbChain = localStorage.getItem('wordduel_pb_chain') || '0';
+  const pbScoreEl = document.getElementById('pbScore');
+  const pbChainEl = document.getElementById('pbChain');
+  if (pbScoreEl) pbScoreEl.textContent = pbScore;
+  if (pbChainEl) pbChainEl.textContent = pbChain;
+}
+
+function switchLobbyTab(tab) {
+  const tabSolo = document.getElementById('tabSolo');
+  const tabMulti = document.getElementById('tabMulti');
+  const soloPanel = document.getElementById('soloPanel');
+  const multiPanel = document.getElementById('multiPanel');
+
+  if (tab === 'solo') {
+    tabSolo.classList.add('active');
+    tabMulti.classList.remove('active');
+    soloPanel.style.display = 'block';
+    multiPanel.style.display = 'none';
+  } else {
+    tabSolo.classList.remove('active');
+    tabMulti.classList.add('active');
+    soloPanel.style.display = 'none';
+    multiPanel.style.display = 'block';
+  }
+  updatePbDisplay();
+}
+
+// -- CUSTOM DURATION TOGGLE --
 function onDurationChange() {
   const val = document.getElementById('gameDuration').value;
   document.getElementById('customTimeWrap').style.display = val === 'custom' ? 'block' : 'none';
 }
 
-// ── CONNECT ──
+// -- CONNECT --
 function connect() {
   if (socket && socket.connected) return;
   socket = io(SERVER_URL, { transports: ['websocket','polling'] });
@@ -400,57 +497,112 @@ function connect() {
 
   socket.on('roomCreated', ({ code, mode, turnSeconds, gameDuration }) => {
     G.roomCode = code; G.mode = mode; G.turnDuration = turnSeconds; G.gameDuration = gameDuration;
+    G.isSolo = false;
     document.getElementById('roomCodeDisplay').textContent = code;
     show('waitingScreen');
   });
 
-  socket.on('gameStart', ({ players, currentPlayer, mode, turnSeconds, gameDuration, gameEndsAt }) => {
+  socket.on('gameStart', ({ players, currentPlayer, mode, turnSeconds, gameDuration, gameEndsAt, isSolo }) => {
     G.players = players;
+    G.isSolo = !!isSolo;
     G.myIndex = players.findIndex(p => p.id === G.myId);
-    G.currentPlayer = currentPlayer; G.mode = mode;
-    G.turnDuration = turnSeconds; G.turnLeft = turnSeconds;
-    G.gameDuration = gameDuration; G.gameEndsAt = gameEndsAt;
-    G.round = 1; G.wordLog = []; G.lastWord = ''; G.expectedStart = '';
+    if (G.isSolo && G.myIndex === -1) G.myIndex = 0;
+    G.currentPlayer = currentPlayer;
+    G.mode = mode;
+    G.turnDuration = turnSeconds;
+    G.turnLeft = turnSeconds;
+    G.gameDuration = gameDuration || 0;
+    G.gameEndsAt = gameEndsAt;
+    G.round = 1;
+    G.wordLog = [];
+    G.lastWord = '';
+    G.expectedStart = '';
+
     resetRematchUI();
     document.getElementById('wordLog').innerHTML = '<span style="color:var(--muted);font-size:15px">none yet...</span>';
     document.getElementById('feedback').textContent = '';
     document.getElementById('wordInput').value = '';
     document.getElementById('penaltyFlash').style.display = 'none';
-    document.getElementById('modeBadge').textContent = mode === 'elimination' ? '☠ ELIMINATION' : '⚠ PENALTY MODE';
-    document.getElementById('modeBadge').className = 'mode-badge ' + (mode==='elimination'?'elim':'pen');
-    renderGame(); show('gameScreen');
-    startTurnTimer(); startGameClock();
+
+    const modeLabel = G.isSolo
+      ? (mode === 'elimination' ? 'SOLO ENDLESS - ELIMINATION' : 'SOLO ENDLESS - PENALTY')
+      : (mode === 'elimination' ? 'ELIMINATION' : 'PENALTY MODE');
+    const badge = document.getElementById('modeBadge');
+    badge.textContent = modeLabel;
+    badge.className = 'mode-badge ' + (mode === 'elimination' ? 'elim' : 'pen');
+
+    // Configure actions for solo vs multi
+    const endGameBtn = document.getElementById('endGameBtn');
+    const giveUpBtn = document.getElementById('giveUpBtn');
+    if (G.isSolo) {
+      endGameBtn.style.display = 'none';
+      giveUpBtn.textContent = 'END RUN';
+      giveUpBtn.className = 'btn-danger';
+    } else {
+      endGameBtn.style.display = 'inline-block';
+      giveUpBtn.textContent = 'GIVE UP';
+      giveUpBtn.className = 'btn btn-secondary';
+    }
+
+    renderGame();
+    show('gameScreen');
+
+    if (G.turnDuration > 0) {
+      document.getElementById('timerWrap').style.display = 'block';
+      startTurnTimer();
+    } else {
+      document.getElementById('timerWrap').style.display = 'none';
+      clearTurnTimer();
+    }
+
+    if (!G.isSolo && G.gameEndsAt) {
+      startGameClock();
+    } else {
+      clearGameClock();
+      document.getElementById('gameClockBar').style.display = 'none';
+    }
   });
 
-  socket.on('wordAccepted', ({ word, pts, playedBy, scores, currentPlayer, expectedStart, gameEndsAt }) => {
-    G.players.forEach(p => { const s=scores.find(x=>x.name===p.name); if(s) p.score=s.score; });
-    G.currentPlayer=currentPlayer; G.lastWord=word; G.expectedStart=expectedStart; G.round++;
+  socket.on('wordAccepted', ({ word, pts, playedBy, scores, currentPlayer, expectedStart, gameEndsAt, isSolo }) => {
+    G.players.forEach(p => { const s = scores.find(x => x.name === p.name); if (s) p.score = s.score; });
+    G.currentPlayer = currentPlayer;
+    G.lastWord = word;
+    G.expectedStart = expectedStart;
+    G.round++;
     if (gameEndsAt) G.gameEndsAt = gameEndsAt;
-    G.wordLog.push({ word, pts, name:playedBy, idx:G.players.findIndex(p=>p.name===playedBy) });
-    addChip(G.wordLog[G.wordLog.length-1]);
-    document.getElementById('feedback').textContent='';
-    document.getElementById('wordInput').value='';
-    renderGame(); resetTurnTimer();
+    if (isSolo !== undefined) G.isSolo = !!isSolo;
+
+    G.wordLog.push({ word, pts, name: playedBy, idx: G.isSolo ? 0 : G.players.findIndex(p => p.name === playedBy) });
+    addChip(G.wordLog[G.wordLog.length - 1]);
+    document.getElementById('feedback').textContent = '';
+    document.getElementById('wordInput').value = '';
+    renderGame();
+    if (G.turnDuration > 0) resetTurnTimer();
     if (isMyTurn()) document.getElementById('wordInput').focus();
   });
 
-  socket.on('penalty', ({ penalisedPlayer, reason, scores, currentPlayer, lastWord, expectedStart, gameEndsAt }) => {
-    G.players.forEach(p => { const s=scores.find(x=>x.name===p.name); if(s) p.score=s.score; });
-    G.currentPlayer=currentPlayer; G.lastWord=lastWord; G.expectedStart=expectedStart;
+  socket.on('penalty', ({ penalisedPlayer, reason, scores, currentPlayer, lastWord, expectedStart, gameEndsAt, isSolo }) => {
+    G.players.forEach(p => { const s = scores.find(x => x.name === p.name); if (s) p.score = s.score; });
+    G.currentPlayer = currentPlayer;
+    G.lastWord = lastWord;
+    G.expectedStart = expectedStart;
     if (gameEndsAt) G.gameEndsAt = gameEndsAt;
+    if (isSolo !== undefined) G.isSolo = !!isSolo;
+
     const flash = document.getElementById('penaltyFlash');
-    flash.textContent = `⚠ ${penalisedPlayer}: ${reason} — -3 pts`;
-    flash.style.display='block';
-    setTimeout(()=>flash.style.display='none', 3000);
-    document.getElementById('wordInput').value='';
-    renderGame(); resetTurnTimer();
+    flash.textContent = `PENALTY: ${penalisedPlayer}: ${reason} - -3 pts`;
+    flash.style.display = 'block';
+    setTimeout(() => { flash.style.display = 'none'; }, 3000);
+    document.getElementById('wordInput').value = '';
+    renderGame();
+    if (G.turnDuration > 0) resetTurnTimer();
     if (isMyTurn()) document.getElementById('wordInput').focus();
   });
 
-  socket.on('checking', () => { setFeedback('Checking dictionary...','info'); lockInput(true); });
-  socket.on('wordError', msg => { setFeedback(msg,'err'); lockInput(false); shakeInput(); });
+  socket.on('checking', () => { setFeedback('Checking dictionary...', 'info'); lockInput(true); });
+  socket.on('wordError', msg => { setFeedback(msg, 'err'); lockInput(false); shakeInput(); });
 
-  // Opponent wants to end
+  // Opponent wants to end (multiplayer only)
   socket.on('endGameRequest', ({ from }) => {
     document.getElementById('endModalMsg').textContent = `${from} wants to end the game. Winner decided by score.`;
     document.getElementById('endModal').classList.add('visible');
@@ -459,13 +611,13 @@ function connect() {
   socket.on('endGameDeclined', ({ by }) => {
     document.getElementById('endModal').classList.remove('visible');
     setFeedback(`${by} declined to end the game.`, 'err');
-    setTimeout(()=>setFeedback('',''), 3000);
+    setTimeout(() => setFeedback('', ''), 3000);
   });
 
   socket.on('rematchRequested', ({ from }) => {
     const btn = document.getElementById('rematchBtn');
     if (btn) {
-      btn.textContent = '⚔ ACCEPT REMATCH!';
+      btn.textContent = 'ACCEPT REMATCH!';
       btn.disabled = false;
       btn.className = 'btn btn-primary pulse-anim';
     }
@@ -476,7 +628,7 @@ function connect() {
   socket.on('rematchPending', () => {
     const btn = document.getElementById('rematchBtn');
     if (btn) {
-      btn.textContent = '⏳ WAITING...';
+      btn.textContent = 'WAITING...';
       btn.disabled = true;
     }
     const status = document.getElementById('rematchStatus');
@@ -486,7 +638,7 @@ function connect() {
   socket.on('rematchDeclined', ({ reason }) => {
     const btn = document.getElementById('rematchBtn');
     if (btn) {
-      btn.textContent = '⚔ REMATCH';
+      btn.textContent = 'REMATCH';
       btn.disabled = true;
       btn.className = 'btn btn-primary';
     }
@@ -494,65 +646,135 @@ function connect() {
     if (status) status.textContent = `> ${reason || 'Opponent left.'}`;
   });
 
-  socket.on('gameOver', ({ reason, winner, draw, scores }) => {
-    clearTurnTimer(); clearGameClock();
+  socket.on('gameOver', ({ reason, winner, draw, scores, isSolo }) => {
+    clearTurnTimer();
+    clearGameClock();
     resetRematchUI();
     document.getElementById('endModal').classList.remove('visible');
-    if (draw) {
-      document.getElementById('overTrophy').textContent = '🤝';
-      document.getElementById('overLabel').textContent = 'DRAW!';
-      document.getElementById('overWinner').textContent = 'IT\'S A TIE';
+
+    const isSoloRun = isSolo !== undefined ? isSolo : G.isSolo;
+    const banner = document.getElementById('newBestBanner');
+    banner.style.display = 'none';
+
+    if (isSoloRun) {
+      document.getElementById('overBadge').textContent = '[ SOLO RUN OVER ]';
+      document.getElementById('overLabel').textContent = 'FINAL SCORE';
+      const myScore = scores && scores[0] ? scores[0].score : (G.players[0]?.score || 0);
+      const totalWords = G.wordLog.length;
+      document.getElementById('overWinner').textContent = `${myScore} PTS`;
       document.getElementById('overWinner').style.color = 'var(--accent)';
+      document.getElementById('overReason').innerHTML = `> <span>${reason} (${totalWords} words chained)</span>`;
+
+      // Check Personal Best
+      const prevBestScore = parseInt(localStorage.getItem('wordduel_pb_score') || '0', 10);
+      const prevBestChain = parseInt(localStorage.getItem('wordduel_pb_chain') || '0', 10);
+      let isNewBest = false;
+      if (myScore > prevBestScore) {
+        localStorage.setItem('wordduel_pb_score', myScore.toString());
+        isNewBest = true;
+      }
+      if (totalWords > prevBestChain) {
+        localStorage.setItem('wordduel_pb_chain', totalWords.toString());
+        isNewBest = true;
+      }
+      if (isNewBest) {
+        banner.style.display = 'block';
+      }
+      updatePbDisplay();
+
+      const bestScore = localStorage.getItem('wordduel_pb_score') || myScore;
+      document.getElementById('fname0').textContent = 'THIS RUN';
+      document.getElementById('fscore0').textContent = myScore;
+      document.getElementById('fcard0').className = 'fcard';
+
+      document.getElementById('fname1').textContent = 'BEST RECORD';
+      document.getElementById('fscore1').textContent = bestScore;
+      document.getElementById('fcard1').className = 'fcard winner';
+
+      const rematchBtn = document.getElementById('rematchBtn');
+      if (rematchBtn) rematchBtn.textContent = 'PLAY AGAIN';
     } else {
-      document.getElementById('overTrophy').textContent = '🏆';
-      document.getElementById('overLabel').textContent = 'WINNER';
-      document.getElementById('overWinner').textContent = winner.toUpperCase();
-      document.getElementById('overWinner').style.color =
-        G.players.findIndex(p=>p.name===winner)===0 ? 'var(--p1)' : 'var(--p2)';
+      document.getElementById('overBadge').textContent = '[ GAME OVER ]';
+      if (draw) {
+        document.getElementById('overLabel').textContent = 'DRAW!';
+        document.getElementById('overWinner').textContent = 'IT IS A TIE';
+        document.getElementById('overWinner').style.color = 'var(--accent)';
+      } else {
+        document.getElementById('overLabel').textContent = 'WINNER';
+        document.getElementById('overWinner').textContent = winner ? winner.toUpperCase() : '?';
+        document.getElementById('overWinner').style.color =
+          G.players.findIndex(p => p.name === winner) === 0 ? 'var(--p1)' : 'var(--p2)';
+      }
+      document.getElementById('overReason').innerHTML = `> <span>${reason}</span>`;
+      scores.forEach((s, i) => {
+        document.getElementById('fname' + i).textContent = s.name;
+        document.getElementById('fscore' + i).textContent = s.score;
+        document.getElementById('fcard' + i).className = 'fcard' + (!draw && s.name === winner ? ' winner' : '');
+      });
+      const rematchBtn = document.getElementById('rematchBtn');
+      if (rematchBtn) rematchBtn.textContent = 'REMATCH';
     }
-    document.getElementById('overReason').innerHTML = `> <span>${reason}</span>`;
-    scores.forEach((s,i) => {
-      document.getElementById('fname'+i).textContent = s.name;
-      document.getElementById('fscore'+i).textContent = s.score;
-      document.getElementById('fcard'+i).className = 'fcard' + (!draw && s.name===winner ? ' winner' : '');
-    });
+
     const ol = document.getElementById('overLog');
     ol.innerHTML = G.wordLog.length ? '' : '<span style="color:var(--muted)">No words played.</span>';
     G.wordLog.forEach(e => {
       const c = document.createElement('div');
-      c.className = 'chip c'+(e.idx+1);
+      c.className = 'chip c' + (e.idx + 1);
       c.innerHTML = e.word + `<span class="pts">+${e.pts}</span>`;
       ol.appendChild(c);
     });
     show('overScreen');
   });
 
-  socket.on('error', msg => { document.getElementById('joinErr').textContent = '> '+msg; });
+  socket.on('error', msg => {
+    const errEl = document.getElementById('joinErr') || document.getElementById('soloErr');
+    if (errEl) errEl.textContent = '> ' + msg;
+  });
+
   socket.on('disconnect', () => {
     if (document.getElementById('gameScreen').classList.contains('hidden')) return;
-    clearTurnTimer(); clearGameClock();
-    document.getElementById('overTrophy').textContent = '⚡';
-    document.getElementById('overLabel').textContent = 'DISCONNECTED';
-    document.getElementById('overWinner').textContent = '—';
+    clearTurnTimer();
+    clearGameClock();
+    document.getElementById('overBadge').textContent = '[ DISCONNECTED ]';
+    document.getElementById('overLabel').textContent = 'STATUS';
+    document.getElementById('overWinner').textContent = 'DISCONNECTED';
+    document.getElementById('overWinner').style.color = 'var(--red)';
     document.getElementById('overReason').innerHTML = '> <span>Connection lost</span>';
     show('overScreen');
   });
 }
 
-// ── ACTIONS ──
+// -- ACTIONS --
+function startSolo() {
+  const name = document.getElementById('soloName').value.trim() || 'Player';
+  localStorage.setItem('wordduel_name', name);
+  document.getElementById('soloErr').textContent = '';
+  G.myName = name;
+  G.isSolo = true;
+  connect();
+  socket.emit('startSolo', {
+    name,
+    turnSeconds: parseInt(document.getElementById('soloTimer').value, 10),
+    mode: document.getElementById('soloMode').value
+  });
+}
+
 function createRoom() {
   const name = document.getElementById('createName').value.trim();
-  if (!name) { document.getElementById('createErr').textContent='> Enter your name'; return; }
-  let gameSecs = parseInt(document.getElementById('gameDuration').value) || 0;
+  if (!name) { document.getElementById('createErr').textContent = '> Enter your name'; return; }
+  localStorage.setItem('wordduel_name', name);
+  let gameSecs = parseInt(document.getElementById('gameDuration').value, 10) || 0;
   if (document.getElementById('gameDuration').value === 'custom') {
-    gameSecs = parseInt(document.getElementById('customTime').value) || 0;
-    if (!gameSecs || gameSecs < 30) { document.getElementById('createErr').textContent='> Enter a valid time (min 30 seconds)'; return; }
+    gameSecs = parseInt(document.getElementById('customTime').value, 10) || 0;
+    if (!gameSecs || gameSecs < 30) { document.getElementById('createErr').textContent = '> Enter a valid time (min 30 seconds)'; return; }
   }
-  document.getElementById('createErr').textContent='';
-  G.myName = name; connect();
+  document.getElementById('createErr').textContent = '';
+  G.myName = name;
+  G.isSolo = false;
+  connect();
   socket.emit('createRoom', {
     name,
-    turnSeconds: parseInt(document.getElementById('createTimer').value),
+    turnSeconds: parseInt(document.getElementById('createTimer').value, 10),
     gameDuration: gameSecs,
     mode: document.getElementById('createMode').value
   });
@@ -561,10 +783,13 @@ function createRoom() {
 function joinRoom() {
   const name = document.getElementById('joinName').value.trim();
   const code = document.getElementById('joinCode').value.trim().toUpperCase();
-  if (!name) { document.getElementById('joinErr').textContent='> Enter your name'; return; }
-  if (code.length!==5) { document.getElementById('joinErr').textContent='> Enter the 5-letter room code'; return; }
-  document.getElementById('joinErr').textContent='';
-  G.myName = name; connect();
+  if (!name) { document.getElementById('joinErr').textContent = '> Enter your name'; return; }
+  if (code.length !== 5) { document.getElementById('joinErr').textContent = '> Enter the 5-letter room code'; return; }
+  localStorage.setItem('wordduel_name', name);
+  document.getElementById('joinErr').textContent = '';
+  G.myName = name;
+  G.isSolo = false;
+  connect();
   socket.emit('joinRoom', { name, code });
 }
 
@@ -577,12 +802,13 @@ function submitWord() {
 }
 
 function giveUp() {
-  if (confirm('Give up and lose the game?')) socket.emit('giveUp');
+  const msg = G.isSolo ? 'End this solo run?' : 'Give up and lose the game?';
+  if (confirm(msg)) socket.emit('giveUp');
 }
 
 function requestEnd() {
   socket.emit('requestEndGame');
-  setFeedback('End game request sent — waiting for opponent...', 'info');
+  setFeedback('End game request sent - waiting for opponent...', 'info');
 }
 
 function acceptEnd() {
@@ -597,8 +823,8 @@ function declineEnd() {
 
 function copyCode() {
   navigator.clipboard.writeText(G.roomCode).then(() => {
-    document.getElementById('copyMsg').textContent='> Copied!';
-    setTimeout(()=>document.getElementById('copyMsg').textContent='', 2000);
+    document.getElementById('copyMsg').textContent = '> Copied!';
+    setTimeout(() => { document.getElementById('copyMsg').textContent = ''; }, 2000);
   });
 }
 
@@ -610,7 +836,7 @@ function requestRematch() {
 function resetRematchUI() {
   const btn = document.getElementById('rematchBtn');
   if (btn) {
-    btn.textContent = '⚔ REMATCH';
+    btn.textContent = G.isSolo ? 'PLAY AGAIN' : 'REMATCH';
     btn.disabled = false;
     btn.className = 'btn btn-primary';
   }
@@ -619,113 +845,159 @@ function resetRematchUI() {
 }
 
 function backToLobby() {
-  clearTurnTimer(); clearGameClock();
+  clearTurnTimer();
+  clearGameClock();
   resetRematchUI();
-  if (socket) socket.disconnect(); socket=null;
-  G = { myId:null,myName:'',roomCode:'',players:[],myIndex:-1,currentPlayer:'',
-    turnDuration:15,turnLeft:0,turnInterval:null,gameDuration:0,gameEndsAt:null,
-    gameClockInterval:null,round:1,wordLog:[],mode:'elimination',lastWord:'',expectedStart:'' };
-  ['createName','joinName','joinCode'].forEach(id=>document.getElementById(id).value='');
+  if (socket) socket.disconnect();
+  socket = null;
+  G = {
+    myId:null, myName:'', roomCode:'', players:[], myIndex:-1, currentPlayer:'',
+    turnDuration:15, turnLeft:0, turnInterval:null, gameDuration:0, gameEndsAt:null,
+    gameClockInterval:null, round:1, wordLog:[], mode:'elimination', lastWord:'', expectedStart:'',
+    isSolo:false
+  };
+  ['joinCode'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  updatePbDisplay();
   show('lobbyScreen');
 }
 
-// ── TURN TIMER ──
+// -- TURN TIMER --
 function startTurnTimer() {
-  clearTurnTimer(); G.turnLeft=G.turnDuration; renderTurnTimer();
-  G.turnInterval = setInterval(()=>{
-    G.turnLeft = Math.max(0, G.turnLeft-1); renderTurnTimer();
+  clearTurnTimer();
+  G.turnLeft = G.turnDuration;
+  renderTurnTimer();
+  G.turnInterval = setInterval(() => {
+    G.turnLeft = Math.max(0, G.turnLeft - 1);
+    renderTurnTimer();
   }, 1000);
 }
 function resetTurnTimer() { startTurnTimer(); }
-function clearTurnTimer() { clearInterval(G.turnInterval); G.turnInterval=null; }
+function clearTurnTimer() { clearInterval(G.turnInterval); G.turnInterval = null; }
 function renderTurnTimer() {
-  const pct = G.turnLeft/G.turnDuration;
-  const col = pct>.5?'#39ff14':pct>.25?'#ff8c00':'#ff3a3a';
-  const fill=document.getElementById('timerFill'), cnt=document.getElementById('timerCount');
-  fill.style.width=(pct*100)+'%'; fill.style.background=col; fill.style.boxShadow=`0 0 8px ${col}`;
-  cnt.style.color=col; cnt.textContent=G.turnLeft;
-  cnt.classList.toggle('pulse-anim', G.turnLeft<=5);
+  const pct = G.turnDuration > 0 ? (G.turnLeft / G.turnDuration) : 1;
+  const col = pct > .5 ? '#39ff14' : pct > .25 ? '#ff8c00' : '#ff3a3a';
+  const fill = document.getElementById('timerFill');
+  const cnt = document.getElementById('timerCount');
+  fill.style.width = (pct * 100) + '%';
+  fill.style.background = col;
+  fill.style.boxShadow = `0 0 8px ${col}`;
+  cnt.style.color = col;
+  cnt.textContent = G.turnLeft;
+  cnt.classList.toggle('pulse-anim', G.turnLeft <= 5 && G.turnLeft > 0);
 }
 
-// ── GAME CLOCK ──
+// -- GAME CLOCK --
 function startGameClock() {
   clearGameClock();
-  if (!G.gameEndsAt) { document.getElementById('gameClockBar').style.display='none'; return; }
-  document.getElementById('gameClockBar').style.display='block';
+  if (!G.gameEndsAt) { document.getElementById('gameClockBar').style.display = 'none'; return; }
+  document.getElementById('gameClockBar').style.display = 'block';
   renderGameClock();
   G.gameClockInterval = setInterval(renderGameClock, 1000);
 }
-function clearGameClock() { clearInterval(G.gameClockInterval); G.gameClockInterval=null; }
+function clearGameClock() { clearInterval(G.gameClockInterval); G.gameClockInterval = null; }
 function renderGameClock() {
   if (!G.gameEndsAt) return;
   const remaining = Math.max(0, Math.round((G.gameEndsAt - Date.now())/1000));
   const total = G.gameDuration;
-  const pct = remaining/total;
-  const mins = Math.floor(remaining/60);
-  const secs = remaining%60;
-  document.getElementById('gameClockCount').textContent = `${mins}:${secs.toString().padStart(2,'0')}`;
-  document.getElementById('gameClockFill').style.width = (pct*100)+'%';
+  const pct = total > 0 ? (remaining / total) : 0;
+  const mins = Math.floor(remaining / 60);
+  const secs = remaining % 60;
+  document.getElementById('gameClockCount').textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+  document.getElementById('gameClockFill').style.width = (pct * 100) + '%';
 }
 
-// ── RENDER ──
-function isMyTurn() { return G.currentPlayer===G.myId; }
+// -- RENDER --
+function isMyTurn() {
+  if (G.isSolo) return true;
+  return G.currentPlayer === G.myId;
+}
 
 function renderGame() {
-  G.players.forEach((p,i)=>{
-    document.getElementById('pname'+i).textContent=p.name;
-    document.getElementById('pscore'+i).textContent=p.score;
-    let cls='player-card';
-    if (i===0&&G.currentPlayer===p.id) cls+=' active-p1';
-    if (i===1&&G.currentPlayer===p.id) cls+=' active-p2';
-    if (p.id===G.myId) cls+=' me-tag';
-    document.getElementById('card'+i).className=cls;
-  });
-  document.getElementById('roundNum').textContent=G.round;
-  const infoBar=document.getElementById('infoBar');
+  if (G.isSolo) {
+    const me = G.players[0] || { name: G.myName || 'Player', score: 0 };
+    document.getElementById('pname0').textContent = me.name;
+    document.getElementById('pscore0').textContent = me.score;
+    document.getElementById('card0').className = 'player-card active-p1 me-tag';
+
+    document.getElementById('roundNum').textContent = G.round;
+    document.getElementById('roundLabel').textContent = 'CHAIN';
+
+    const pbScore = localStorage.getItem('wordduel_pb_score') || '0';
+    document.getElementById('pname1').textContent = 'BEST';
+    document.getElementById('pscore1').textContent = pbScore;
+    document.getElementById('card1').className = 'player-card';
+  } else {
+    G.players.forEach((p, i) => {
+      document.getElementById('pname' + i).textContent = p.name;
+      document.getElementById('pscore' + i).textContent = p.score;
+      let cls = 'player-card';
+      if (i === 0 && G.currentPlayer === p.id) cls += ' active-p1';
+      if (i === 1 && G.currentPlayer === p.id) cls += ' active-p2';
+      if (p.id === G.myId) cls += ' me-tag';
+      document.getElementById('card' + i).className = cls;
+    });
+    document.getElementById('roundNum').textContent = G.round;
+    document.getElementById('roundLabel').textContent = 'RND';
+  }
+
+  const infoBar = document.getElementById('infoBar');
   if (G.lastWord) {
-    infoBar.innerHTML=`
+    infoBar.innerHTML = `
       <span class="info-label">LAST WORD</span>
       <span class="last-word">${G.lastWord.toUpperCase()}</span>
       <span class="start-letter">NEXT STARTS WITH<span>${G.expectedStart.toUpperCase()}</span></span>`;
   } else {
-    infoBar.innerHTML=`<span class="info-label">FIRST WORD — enter anything!</span>`;
+    infoBar.innerHTML = `<span class="info-label">FIRST WORD: enter anything!</span>`;
   }
-  const myTurn=isMyTurn();
-  const curName=G.players.find(p=>p.id===G.currentPlayer)?.name||'?';
-  const col=G.players.findIndex(p=>p.id===G.currentPlayer)===0?'var(--p1)':'var(--p2)';
-  document.getElementById('yourTurnBanner').style.display=myTurn?'block':'none';
-  document.getElementById('turnIndicator').innerHTML=myTurn
-    ?`<span class="turn-name" style="color:var(--accent)">YOUR TURN</span>`
-    :`<span style="color:var(--muted)">WAITING FOR </span><span class="turn-name" style="color:${col}">${curName.toUpperCase()}</span>`;
+
+  const myTurn = isMyTurn();
+  const curName = G.players.find(p => p.id === G.currentPlayer)?.name || '?';
+  const col = G.players.findIndex(p => p.id === G.currentPlayer) === 0 ? 'var(--p1)' : 'var(--p2)';
+  document.getElementById('yourTurnBanner').style.display = myTurn ? 'block' : 'none';
+  if (G.isSolo) {
+    document.getElementById('turnIndicator').innerHTML = `<span class="turn-name" style="color:var(--accent)">WORD #${G.round}</span>`;
+  } else {
+    document.getElementById('turnIndicator').innerHTML = myTurn
+      ? `<span class="turn-name" style="color:var(--accent)">YOUR TURN</span>`
+      : `<span style="color:var(--muted)">WAITING FOR </span><span class="turn-name" style="color:${col}">${curName.toUpperCase()}</span>`;
+  }
   lockInput(!myTurn);
 }
 
 function addChip(entry) {
-  const log=document.getElementById('wordLog');
-  if (log.querySelector('span')) log.innerHTML='';
-  const c=document.createElement('div');
-  c.className='chip c'+(entry.idx+1);
-  c.innerHTML=entry.word+`<span class="pts">+${entry.pts}</span>`;
-  log.appendChild(c); log.scrollTop=log.scrollHeight;
+  const log = document.getElementById('wordLog');
+  if (log.querySelector('span')) log.innerHTML = '';
+  const c = document.createElement('div');
+  c.className = 'chip c' + (entry.idx + 1);
+  c.innerHTML = entry.word + `<span class="pts">+${entry.pts}</span>`;
+  log.appendChild(c);
+  log.scrollTop = log.scrollHeight;
 }
 
 function lockInput(on) {
-  document.getElementById('wordInput').disabled=on;
-  document.getElementById('submitBtn').disabled=on;
-  if (!on) setFeedback('','');
+  document.getElementById('wordInput').disabled = on;
+  document.getElementById('submitBtn').disabled = on;
+  if (!on) setFeedback('', '');
 }
-function setFeedback(msg,type) {
-  const fb=document.getElementById('feedback');
-  fb.textContent=msg?'> '+msg:''; fb.className='feedback '+type;
+function setFeedback(msg, type) {
+  const fb = document.getElementById('feedback');
+  fb.textContent = msg ? '> ' + msg : '';
+  fb.className = 'feedback ' + type;
 }
 function shakeInput() {
-  const inp=document.getElementById('wordInput');
-  inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
-  setTimeout(()=>inp.classList.remove('shake'),400); lockInput(false);
+  const inp = document.getElementById('wordInput');
+  inp.classList.remove('shake');
+  void inp.offsetWidth;
+  inp.classList.add('shake');
+  setTimeout(() => inp.classList.remove('shake'), 400);
+  lockInput(false);
 }
 function show(id) {
-  ['lobbyScreen','waitingScreen','gameScreen','overScreen'].forEach(s=>
-    document.getElementById(s).classList.toggle('hidden',s!==id));
+  ['lobbyScreen', 'waitingScreen', 'gameScreen', 'overScreen'].forEach(s =>
+    document.getElementById(s).classList.toggle('hidden', s !== id));
 }
 </script>
 </body>

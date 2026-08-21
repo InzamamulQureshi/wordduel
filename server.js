@@ -100,6 +100,35 @@ function handleMistake(room, loserSocketId, reason) {
   const loser = room.players.find(p => p.id === loserSocketId);
   if (!loser || room.phase !== 'playing') return;
 
+  if (room.isSolo) {
+    if (room.mode === 'elimination') {
+      clearGameClock(room);
+      room.phase = 'over';
+      io.to(room.code).emit('gameOver', {
+        reason: `${loser.name} ${reason}`,
+        winner: null,
+        draw: false,
+        isSolo: true,
+        scores: room.players.map(p => ({ name: p.name, score: p.score }))
+      });
+    } else {
+      loser.score = Math.max(0, loser.score - 3);
+      room.currentPlayer = loserSocketId;
+      io.to(room.code).emit('penalty', {
+        penalisedPlayer: loser.name,
+        reason,
+        scores: room.players.map(p => ({ name: p.name, score: p.score })),
+        currentPlayer: room.currentPlayer,
+        lastWord: room.lastWord,
+        expectedStart: room.expectedStart,
+        gameEndsAt: null,
+        isSolo: true,
+      });
+      startTurnTimer(room);
+    }
+    return;
+  }
+
   if (room.mode === 'elimination') {
     clearGameClock(room);
     room.phase = 'over';
@@ -108,6 +137,7 @@ function handleMistake(room, loserSocketId, reason) {
       reason: `${loser.name} ${reason}`,
       winner: winner ? winner.name : '?',
       draw: false,
+      isSolo: false,
       scores: room.players.map(p => ({ name: p.name, score: p.score }))
     });
   } else {
@@ -121,6 +151,7 @@ function handleMistake(room, loserSocketId, reason) {
       lastWord: room.lastWord,
       expectedStart: room.expectedStart,
       gameEndsAt: room.gameEndsAt || null,
+      isSolo: false,
     });
     startTurnTimer(room);
   }
@@ -130,12 +161,50 @@ function handleMistake(room, loserSocketId, reason) {
 io.on('connection', socket => {
   console.log('connect', socket.id);
 
+  // START SOLO (ENDLESS)
+  socket.on('startSolo', ({ name, turnSeconds, mode }) => {
+    const code = makeCode();
+    const room = {
+      code,
+      phase: 'playing',
+      isSolo: true,
+      mode: mode || 'elimination',
+      turnSeconds: turnSeconds !== undefined ? turnSeconds : 15,
+      gameDuration: 0, // endless
+      players: [{ id: socket.id, name: name || 'Player', score: 0 }],
+      usedWords: new Set(),
+      lastWord: null,
+      expectedStart: null,
+      currentPlayer: socket.id,
+      timerRef: null,
+      gameClockRef: null,
+      gameEndsAt: null,
+      endVotes: new Set(),
+      rematchVotes: new Set(),
+    };
+    rooms[code] = room;
+    socket.join(code);
+    socket.data.roomCode = code;
+    socket.emit('gameStart', {
+      players: room.players.map(p => ({ name: p.name, score: p.score, id: p.id })),
+      currentPlayer: room.currentPlayer,
+      mode: room.mode,
+      turnSeconds: room.turnSeconds,
+      gameDuration: 0,
+      gameEndsAt: null,
+      isSolo: true,
+    });
+    if (room.turnSeconds) startTurnTimer(room);
+    console.log(`Solo room ${code} started for ${name}`);
+  });
+
   // CREATE ROOM
   socket.on('createRoom', ({ name, turnSeconds, gameDuration, mode }) => {
     const code = makeCode();
     rooms[code] = {
       code,
       phase: 'waiting',
+      isSolo: false,
       mode: mode || 'elimination',
       turnSeconds: turnSeconds || 15,
       gameDuration: gameDuration || 0, // seconds, 0 = no limit
@@ -178,6 +247,7 @@ io.on('connection', socket => {
       turnSeconds: room.turnSeconds,
       gameDuration: room.gameDuration,
       gameEndsAt: room.gameEndsAt,
+      isSolo: false,
     });
     startTurnTimer(room);
     console.log(`Room ${code} started`);
@@ -193,7 +263,7 @@ io.on('connection', socket => {
     const word = rawWord.trim().toLowerCase();
     if (!/^[a-z]+$/.test(word)) { socket.emit('wordError', 'Letters only!'); return; }
     if (room.expectedStart && word[0] !== room.expectedStart) {
-      handleMistake(room, socket.id, `used "${word}" — wrong starting letter`); return;
+      handleMistake(room, socket.id, `used "${word}" - wrong starting letter`); return;
     }
     if (room.usedWords.has(word)) {
       handleMistake(room, socket.id, `repeated "${word}"`); return;
@@ -215,7 +285,7 @@ io.on('connection', socket => {
     room.usedWords.add(word);
     room.lastWord = word;
     room.expectedStart = word[word.length - 1];
-    room.currentPlayer = room.players.find(p => p.id !== socket.id)?.id;
+    room.currentPlayer = room.isSolo ? socket.id : room.players.find(p => p.id !== socket.id)?.id;
     io.to(room.code).emit('wordAccepted', {
       word, pts,
       playedBy: player.name,
@@ -223,6 +293,7 @@ io.on('connection', socket => {
       currentPlayer: room.currentPlayer,
       expectedStart: room.expectedStart,
       gameEndsAt: room.gameEndsAt || null,
+      isSolo: !!room.isSolo,
     });
     startTurnTimer(room);
   });
@@ -232,6 +303,19 @@ io.on('connection', socket => {
     const room = rooms[socket.data.roomCode];
     if (!room || room.phase !== 'playing') return;
     const name = room.players.find(p => p.id === socket.id)?.name;
+    if (room.isSolo) {
+      clearRoomTimer(room);
+      clearGameClock(room);
+      room.phase = 'over';
+      io.to(room.code).emit('gameOver', {
+        reason: `${name} ended the run`,
+        winner: null,
+        draw: false,
+        isSolo: true,
+        scores: room.players.map(p => ({ name: p.name, score: p.score }))
+      });
+      return;
+    }
     handleMistake(room, socket.id, `${name} gave up`);
   });
 
@@ -241,6 +325,19 @@ io.on('connection', socket => {
     if (!room || room.phase !== 'playing') return;
     const requester = room.players.find(p => p.id === socket.id);
     if (!requester) return;
+    if (room.isSolo) {
+      clearRoomTimer(room);
+      clearGameClock(room);
+      room.phase = 'over';
+      io.to(room.code).emit('gameOver', {
+        reason: 'Run ended',
+        winner: null,
+        draw: false,
+        isSolo: true,
+        scores: room.players.map(p => ({ name: p.name, score: p.score }))
+      });
+      return;
+    }
     room.endVotes.add(socket.id);
     // Tell the OTHER player someone wants to end
     const other = room.players.find(p => p.id !== socket.id);
@@ -276,6 +373,29 @@ io.on('connection', socket => {
     const player = room.players.find(p => p.id === socket.id);
     if (!player) return;
 
+    if (room.isSolo) {
+      clearRoomTimer(room);
+      clearGameClock(room);
+      room.phase = 'playing';
+      room.usedWords = new Set();
+      room.lastWord = null;
+      room.expectedStart = null;
+      room.players[0].score = 0;
+      room.currentPlayer = socket.id;
+      socket.emit('gameStart', {
+        players: room.players.map(p => ({ name: p.name, score: p.score, id: p.id })),
+        currentPlayer: room.currentPlayer,
+        mode: room.mode,
+        turnSeconds: room.turnSeconds,
+        gameDuration: 0,
+        gameEndsAt: null,
+        isSolo: true,
+      });
+      if (room.turnSeconds) startTurnTimer(room);
+      console.log(`Solo rematch started in room ${code}`);
+      return;
+    }
+
     room.rematchVotes.add(socket.id);
 
     if (room.rematchVotes.size === 1) {
@@ -304,6 +424,7 @@ io.on('connection', socket => {
         turnSeconds: room.turnSeconds,
         gameDuration: room.gameDuration,
         gameEndsAt: room.gameEndsAt,
+        isSolo: false,
       });
       startTurnTimer(room);
       console.log(`Rematch started in room ${code}`);
