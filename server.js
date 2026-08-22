@@ -1,10 +1,12 @@
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const app = express();
 app.use(cors());
-app.get('/', (_, res) => res.send('WordDuel server running'));
+app.use(express.static(__dirname));
+app.get('/', (_, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*', methods: ['GET', 'POST'] } });
@@ -19,7 +21,7 @@ function makeCode() {
   return code;
 }
 
-// ── SCORING ──
+// -- SCORING --
 function scoreWord(word) {
   const len = word.length;
   let pts = Math.max(0, len - 3);
@@ -28,29 +30,113 @@ function scoreWord(word) {
   return Math.max(1, pts);
 }
 
-// ── DICTIONARY — dictionaryapi.dev ──
-// Unlike Datamuse's `sp=` endpoint (a fuzzy "did you mean" spelling-suggestion
-// lookup that will match near-misses and even gibberish), dictionaryapi.dev
-// returns actual dictionary entries: 200 for a real word, 404 for anything else.
-async function isRealWord(word) {
+// -- DICTIONARY SERVICE --
+// Primary: Free Dictionary API (https://freedictionaryapi.com/)
+// Fallback: DictionaryAPI.dev (https://api.dictionaryapi.dev/)
+// FreeDictionaryAPI has a 1,000 req/hr per IP limit. When 429 is received or limit reached,
+// we catch it, activate fallback cooldown, and fall back to the old API (dictionaryapi.dev).
+
+let freeDictRateLimitedUntil = 0;
+
+function extractDefinitionFromFreeDict(data) {
+  if (!data || !Array.isArray(data.entries)) return '';
+  for (const entry of data.entries) {
+    if (Array.isArray(entry.senses)) {
+      for (const sense of entry.senses) {
+        if (sense.definition && typeof sense.definition === 'string' && sense.definition.trim()) {
+          return sense.definition.trim().replace(/-/g, '-');
+        }
+      }
+    }
+  }
+  return '';
+}
+
+function extractDefinitionFromOldDict(data) {
+  if (!data || !Array.isArray(data)) return '';
+  for (const entry of data) {
+    if (Array.isArray(entry.meanings)) {
+      for (const meaning of entry.meanings) {
+        if (Array.isArray(meaning.definitions)) {
+          for (const def of meaning.definitions) {
+            if (def.definition && typeof def.definition === 'string' && def.definition.trim()) {
+              return def.definition.trim().replace(/-/g, '-');
+            }
+          }
+        }
+      }
+    }
+  }
+  return '';
+}
+
+async function checkFreeDictionaryApi(word) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    const res = await fetch(`https://freedictionaryapi.com/api/v1/entries/en/${encodeURIComponent(word)}`, {
+      signal: controller.signal,
+      headers: { 'Accept': 'application/json' }
+    });
+    if (res.status === 429) {
+      console.warn('[Dictionary] FreeDictionaryAPI rate limit reached (429). Falling back to backup dictionary.');
+      // Cooldown for 5 minutes before retrying FreeDictionaryAPI
+      freeDictRateLimitedUntil = Date.now() + 5 * 60 * 1000;
+      return { rateLimited: true };
+    }
+    if (res.status === 404) {
+      return { valid: false, definition: '' };
+    }
+    if (!res.ok) {
+      // 5xx or unexpected error: fall back to backup API
+      return { error: true };
+    }
+    const data = await res.json();
+    const isValid = !!(data && Array.isArray(data.entries) && data.entries.length > 0);
+    const definition = isValid ? extractDefinitionFromFreeDict(data) : '';
+    return { valid: isValid, definition };
+  } catch {
+    return { error: true };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function checkOldDictionaryApi(word) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 5000);
   try {
     const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`, {
       signal: controller.signal,
     });
-    if (res.status === 404) return false;
-    if (!res.ok) return true; // fail open on unexpected API errors (5xx etc.)
+    if (res.status === 404) return { valid: false, definition: '' };
+    if (!res.ok) return { valid: true, definition: '' }; // fail open on unexpected API errors (5xx etc.)
     const data = await res.json();
-    return Array.isArray(data) && data.length > 0;
+    const isValid = Array.isArray(data) && data.length > 0;
+    const definition = isValid ? extractDefinitionFromOldDict(data) : '';
+    return { valid: isValid, definition };
   } catch {
-    return true; // fail open if the API is unreachable/timed out
+    return { valid: true, definition: '' }; // fail open if unreachable
   } finally {
     clearTimeout(timeout);
   }
 }
 
-// ── TURN TIMER ──
+async function isRealWord(word) {
+  // If not currently in rate-limit cooldown, try FreeDictionaryAPI first
+  if (Date.now() >= freeDictRateLimitedUntil) {
+    const result = await checkFreeDictionaryApi(word);
+    if (result.valid !== undefined) {
+      return result;
+    }
+    // If rate-limited or error occurred, proceed to fallback
+  }
+
+  // Fall back to backup API (dictionaryapi.dev)
+  return await checkOldDictionaryApi(word);
+}
+
+// -- TURN TIMER --
 function clearRoomTimer(room) {
   if (room.timerRef) { clearTimeout(room.timerRef); room.timerRef = null; }
 }
@@ -63,7 +149,7 @@ function startTurnTimer(room) {
   }, room.turnSeconds * 1000);
 }
 
-// ── GAME CLOCK (total game duration) ──
+// -- GAME CLOCK (total game duration) --
 function startGameClock(room) {
   if (!room.gameDuration) return; // 0 = no limit
   room.gameEndsAt = Date.now() + room.gameDuration * 1000;
@@ -93,12 +179,42 @@ function endGameByTime(room) {
   });
 }
 
-// ── MISTAKE HANDLER ──
+// -- MISTAKE HANDLER --
 function handleMistake(room, loserSocketId, reason) {
   clearRoomTimer(room);
   room.isChecking = false;
   const loser = room.players.find(p => p.id === loserSocketId);
   if (!loser || room.phase !== 'playing') return;
+
+  if (room.isSolo) {
+    if (room.mode === 'elimination') {
+      clearGameClock(room);
+      room.phase = 'over';
+      io.to(room.code).emit('gameOver', {
+        reason: `${loser.name} ${reason}`,
+        winner: null,
+        draw: false,
+        isSolo: true,
+        scores: room.players.map(p => ({ name: p.name, score: p.score }))
+      });
+    } else {
+      loser.score = Math.max(0, loser.score - 3);
+      room.currentPlayer = loserSocketId;
+      io.to(room.code).emit('penalty', {
+        penalisedPlayer: loser.name,
+        reason,
+        scores: room.players.map(p => ({ name: p.name, score: p.score })),
+        currentPlayer: room.currentPlayer,
+        lastWord: room.lastWord,
+        definition: room.lastDefinition || '',
+        expectedStart: room.expectedStart,
+        gameEndsAt: null,
+        isSolo: true,
+      });
+      startTurnTimer(room);
+    }
+    return;
+  }
 
   if (room.mode === 'elimination') {
     clearGameClock(room);
@@ -108,6 +224,7 @@ function handleMistake(room, loserSocketId, reason) {
       reason: `${loser.name} ${reason}`,
       winner: winner ? winner.name : '?',
       draw: false,
+      isSolo: false,
       scores: room.players.map(p => ({ name: p.name, score: p.score }))
     });
   } else {
@@ -119,16 +236,56 @@ function handleMistake(room, loserSocketId, reason) {
       scores: room.players.map(p => ({ name: p.name, score: p.score })),
       currentPlayer: room.currentPlayer,
       lastWord: room.lastWord,
+      definition: room.lastDefinition || '',
       expectedStart: room.expectedStart,
       gameEndsAt: room.gameEndsAt || null,
+      isSolo: false,
     });
     startTurnTimer(room);
   }
 }
 
-// ── SOCKET EVENTS ──
+// -- SOCKET EVENTS --
 io.on('connection', socket => {
   console.log('connect', socket.id);
+
+  // START SOLO (ENDLESS)
+  socket.on('startSolo', ({ name, turnSeconds, mode }) => {
+    const code = makeCode();
+    const room = {
+      code,
+      phase: 'playing',
+      isSolo: true,
+      mode: mode || 'elimination',
+      turnSeconds: turnSeconds !== undefined ? turnSeconds : 15,
+      gameDuration: 0, // endless
+      players: [{ id: socket.id, name: name || 'Player', score: 0 }],
+      usedWords: new Set(),
+      lastWord: null,
+      lastDefinition: null,
+      expectedStart: null,
+      currentPlayer: socket.id,
+      timerRef: null,
+      gameClockRef: null,
+      gameEndsAt: null,
+      endVotes: new Set(),
+      rematchVotes: new Set(),
+    };
+    rooms[code] = room;
+    socket.join(code);
+    socket.data.roomCode = code;
+    socket.emit('gameStart', {
+      players: room.players.map(p => ({ name: p.name, score: p.score, id: p.id })),
+      currentPlayer: room.currentPlayer,
+      mode: room.mode,
+      turnSeconds: room.turnSeconds,
+      gameDuration: 0,
+      gameEndsAt: null,
+      isSolo: true,
+    });
+    if (room.turnSeconds) startTurnTimer(room);
+    console.log(`Solo room ${code} started for ${name}`);
+  });
 
   // CREATE ROOM
   socket.on('createRoom', ({ name, turnSeconds, gameDuration, mode }) => {
@@ -136,12 +293,14 @@ io.on('connection', socket => {
     rooms[code] = {
       code,
       phase: 'waiting',
+      isSolo: false,
       mode: mode || 'elimination',
       turnSeconds: turnSeconds || 15,
       gameDuration: gameDuration || 0, // seconds, 0 = no limit
       players: [{ id: socket.id, name, score: 0 }],
       usedWords: new Set(),
       lastWord: null,
+      lastDefinition: null,
       expectedStart: null,
       currentPlayer: null,
       timerRef: null,
@@ -178,6 +337,7 @@ io.on('connection', socket => {
       turnSeconds: room.turnSeconds,
       gameDuration: room.gameDuration,
       gameEndsAt: room.gameEndsAt,
+      isSolo: false,
     });
     startTurnTimer(room);
     console.log(`Room ${code} started`);
@@ -193,7 +353,7 @@ io.on('connection', socket => {
     const word = rawWord.trim().toLowerCase();
     if (!/^[a-z]+$/.test(word)) { socket.emit('wordError', 'Letters only!'); return; }
     if (room.expectedStart && word[0] !== room.expectedStart) {
-      handleMistake(room, socket.id, `used "${word}" — wrong starting letter`); return;
+      handleMistake(room, socket.id, `used "${word}" - wrong starting letter`); return;
     }
     if (room.usedWords.has(word)) {
       handleMistake(room, socket.id, `repeated "${word}"`); return;
@@ -201,7 +361,7 @@ io.on('connection', socket => {
 
     room.isChecking = true;
     socket.emit('checking');
-    const valid = await isRealWord(word);
+    const { valid, definition } = await isRealWord(word);
     room.isChecking = false;
 
     if (room.phase !== 'playing') return;
@@ -214,15 +374,19 @@ io.on('connection', socket => {
     player.score += pts;
     room.usedWords.add(word);
     room.lastWord = word;
+    room.lastDefinition = definition || '';
     room.expectedStart = word[word.length - 1];
-    room.currentPlayer = room.players.find(p => p.id !== socket.id)?.id;
+    room.currentPlayer = room.isSolo ? socket.id : room.players.find(p => p.id !== socket.id)?.id;
     io.to(room.code).emit('wordAccepted', {
-      word, pts,
+      word,
+      definition: room.lastDefinition,
+      pts,
       playedBy: player.name,
       scores: room.players.map(p => ({ name: p.name, score: p.score })),
       currentPlayer: room.currentPlayer,
       expectedStart: room.expectedStart,
       gameEndsAt: room.gameEndsAt || null,
+      isSolo: !!room.isSolo,
     });
     startTurnTimer(room);
   });
@@ -232,6 +396,19 @@ io.on('connection', socket => {
     const room = rooms[socket.data.roomCode];
     if (!room || room.phase !== 'playing') return;
     const name = room.players.find(p => p.id === socket.id)?.name;
+    if (room.isSolo) {
+      clearRoomTimer(room);
+      clearGameClock(room);
+      room.phase = 'over';
+      io.to(room.code).emit('gameOver', {
+        reason: `${name} ended the run`,
+        winner: null,
+        draw: false,
+        isSolo: true,
+        scores: room.players.map(p => ({ name: p.name, score: p.score }))
+      });
+      return;
+    }
     handleMistake(room, socket.id, `${name} gave up`);
   });
 
@@ -241,6 +418,19 @@ io.on('connection', socket => {
     if (!room || room.phase !== 'playing') return;
     const requester = room.players.find(p => p.id === socket.id);
     if (!requester) return;
+    if (room.isSolo) {
+      clearRoomTimer(room);
+      clearGameClock(room);
+      room.phase = 'over';
+      io.to(room.code).emit('gameOver', {
+        reason: 'Run ended',
+        winner: null,
+        draw: false,
+        isSolo: true,
+        scores: room.players.map(p => ({ name: p.name, score: p.score }))
+      });
+      return;
+    }
     room.endVotes.add(socket.id);
     // Tell the OTHER player someone wants to end
     const other = room.players.find(p => p.id !== socket.id);
@@ -276,6 +466,30 @@ io.on('connection', socket => {
     const player = room.players.find(p => p.id === socket.id);
     if (!player) return;
 
+    if (room.isSolo) {
+      clearRoomTimer(room);
+      clearGameClock(room);
+      room.phase = 'playing';
+      room.usedWords = new Set();
+      room.lastWord = null;
+      room.lastDefinition = null;
+      room.expectedStart = null;
+      room.players[0].score = 0;
+      room.currentPlayer = socket.id;
+      socket.emit('gameStart', {
+        players: room.players.map(p => ({ name: p.name, score: p.score, id: p.id })),
+        currentPlayer: room.currentPlayer,
+        mode: room.mode,
+        turnSeconds: room.turnSeconds,
+        gameDuration: 0,
+        gameEndsAt: null,
+        isSolo: true,
+      });
+      if (room.turnSeconds) startTurnTimer(room);
+      console.log(`Solo rematch started in room ${code}`);
+      return;
+    }
+
     room.rematchVotes.add(socket.id);
 
     if (room.rematchVotes.size === 1) {
@@ -291,6 +505,7 @@ io.on('connection', socket => {
       room.phase = 'playing';
       room.usedWords = new Set();
       room.lastWord = null;
+      room.lastDefinition = null;
       room.expectedStart = null;
       room.endVotes = new Set();
       room.rematchVotes = new Set();
@@ -304,6 +519,7 @@ io.on('connection', socket => {
         turnSeconds: room.turnSeconds,
         gameDuration: room.gameDuration,
         gameEndsAt: room.gameEndsAt,
+        isSolo: false,
       });
       startTurnTimer(room);
       console.log(`Rematch started in room ${code}`);
