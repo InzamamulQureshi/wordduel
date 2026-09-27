@@ -59,7 +59,7 @@ Longer words = more points. Use big words to dominate.
 | Backend | Node.js + Express + Socket.io |
 | Dictionary | [Datamuse API](https://api.datamuse.com) |
 | Frontend Hosting | [Vercel](https://vercel.com) |
-| Backend Hosting | [Gamerjagdish Cloud](https://gamerjagdish.cloud/api/deploy/Vs9PkC5vbZvqTFJA36y6U) |
+| Backend Hosting | [Gamerjagdish Cloud](http://inzamamulqureshi-wordduel-42sr1k-09aed1-72-60-220-75.sslip.io) |
 | Fonts | [Google Fonts](https://fonts.google.com) — Press Start 2P, VT323 |
 
 ---
