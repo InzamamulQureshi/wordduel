@@ -59,7 +59,7 @@ Longer words = more points. Use big words to dominate.
 | Backend | Node.js + Express + Socket.io |
 | Dictionary | [Datamuse API](https://api.datamuse.com) |
 | Frontend Hosting | [Vercel](https://vercel.com) |
-| Backend Hosting | [Railway](https://railway.app) |
+| Backend Hosting | [Gamerjagdish Cloud](https://gamerjagdish.cloud/api/deploy/Vs9PkC5vbZvqTFJA36y6U) |
 | Fonts | [Google Fonts](https://fonts.google.com) — Press Start 2P, VT323 |
 
 ---
