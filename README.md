@@ -132,5 +132,3 @@ Pull requests are welcome! Some ideas:
 MIT License — free to use, modify, and distribute.
 
 ---
-
-<p align="center">⚠️ Made with Claude Sonnet 4.6</p>
